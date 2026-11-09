@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 - 2026-11-09
+
+* First release archived on Zenodo, so Precedent has a citable DOI. No code changes.
+
 ## 0.2.2 - 2026-11-09
 
 * Docs only: the package description on PyPI is refreshed from the current README. No code changes.
