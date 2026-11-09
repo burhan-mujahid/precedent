@@ -6,6 +6,7 @@ Use it when an AI agent (customer support, operations, sales, finance, on-call) 
 
 ## Docs
 
+- [Website](https://burhan-mujahid.github.io/precedent/): one-page overview with real decisions and live results
 - [README](https://github.com/burhan-mujahid/precedent/blob/main/README.md): quick start, integrations, commands, configuration
 - [Design](https://github.com/burhan-mujahid/precedent/blob/main/docs/DESIGN.md): data model, gates, learning loop, drift, evals, related work
 - [Live results](https://github.com/burhan-mujahid/precedent/blob/main/docs/LIVE-RESULTS.md): unedited runs with Gemini and Kimi

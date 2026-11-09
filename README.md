@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://burhan-mujahid.github.io/precedent/"><b>Website</b></a> ·
   <a href="#-quick-start">Quick start</a> ·
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-plug-it-into-your-agent">Integrations</a> ·

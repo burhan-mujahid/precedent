@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Precedent: your team’s rules, enforced before every agent action</title>
+  <meta name="description" content="Precedent turns your team's chat into rules a person approves, and checks them before any AI agent acts. Open source, MIT, works offline.">
+  <link rel="canonical" href="https://burhan-mujahid.github.io/precedent/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Precedent">
+  <meta property="og:title" content="Precedent: agents ask first, people decide">
+  <meta property="og:description" content="Your team&rsquo;s chat, turned into approved rules every AI agent checks before acting. Act, needs approval or escalate, decided by gates outside the model.">
+  <meta property="og:url" content="https://burhan-mujahid.github.io/precedent/">
+  <meta property="og:image" content="https://burhan-mujahid.github.io/precedent/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="Precedent: turn how your team already works into rules your AI agents follow, and keep those rules true.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="author" content="Muhammad Burhan Mujahid">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400;500&family=Atkinson+Hyperlegible+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "Precedent",
+   "description": "Human-approved operating rules and deterministic action gates for AI agents, mined from team chat.",
+   "codeRepository": "https://github.com/burhan-mujahid/precedent", "programmingLanguage": "Python", "license": "https://opensource.org/licenses/MIT",
+   "author": {"@type": "Person", "name": "Muhammad Burhan Mujahid"}}
+  </script>
+</head>
+<body>
+
+<header class="mast">
+  <div class="container mast__inner">
+    <a class="mast__word" href="./" aria-label="Precedent home">Precedent</a>
+    <nav class="mast__nav" aria-label="Page">
+      <a href="#decisions">Decisions</a>
+      <a href="#loop">The loop</a>
+      <a href="#results">Results</a>
+      <a href="#questions">Questions</a>
+      <a class="mast__gh" href="https://github.com/burhan-mujahid/precedent">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container hero__grid">
+      <h1>Agents ask first.<br>People decide.</h1>
+      <div class="hero__side">
+        <p class="lead">Your team&rsquo;s chat, turned into approved rules every agent checks before acting.</p>
+        <div class="hero__actions">
+          <a class="btn btn--primary" href="https://github.com/burhan-mujahid/precedent">Get it on GitHub</a>
+          <div class="copy">
+            <code id="install">pip install git+https://github.com/burhan-mujahid/precedent</code>
+            <button class="btn btn--quiet copy__btn" type="button" data-copy="install">Copy</button>
+            <span class="visually-hidden" aria-live="polite" data-copy-status></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="decisions" id="decisions" aria-labelledby="decisions-h">
+    <div class="container">
+      <div class="head">
+        <h2 id="decisions-h">Three situations, three decisions</h2>
+        <p class="head__line">Real output from the sample bakery rulebook.</p>
+      </div>
+      <div class="panels panels--3">
+        <article class="decision">
+          <h3>Delivery 1.5 hours late</h3>
+          <span class="chip chip--ok">Act</span>
+          <p>&ldquo;Message the customer before they message us&hellip;&rdquo;</p>
+          <dl class="readout">
+            <div><dt>Rule</dt><dd class="measured">R-004 v1</dd></div>
+            <div><dt>Confidence</dt><dd class="measured">0.89</dd></div>
+          </dl>
+        </article>
+        <article class="decision">
+          <h3>Birthday cake arrived damaged</h3>
+          <span class="chip chip--person">Needs approval</span>
+          <p>&ldquo;Ask for a photo first&hellip;&rdquo;</p>
+          <dl class="readout">
+            <div><dt>Rule</dt><dd class="measured">R-003 v1</dd></div>
+            <div><dt>Confidence</dt><dd class="measured">0.88</dd></div>
+          </dl>
+        </article>
+        <article class="decision">
+          <h3>Supplier&rsquo;s bank details changed</h3>
+          <span class="chip chip--bad">Escalate</span>
+          <p>No rule covers it. A person decides.</p>
+          <dl class="readout">
+            <div><dt>Closest rule</dt><dd class="measured">R-006</dd></div>
+            <div><dt>Coverage</dt><dd class="measured">0.21 &lt; 0.30</dd></div>
+          </dl>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="loop" id="loop" aria-labelledby="loop-h">
+    <div class="container loop__grid">
+      <div class="head head--side">
+        <h2 id="loop-h">An escalation becomes a rule</h2>
+        <p class="head__line">Answered once, never escalated again.</p>
+      </div>
+      <ol class="trail">
+        <li>
+          <span class="trail__who trail__who--system">Agent</span>
+          <p>Escalates the bank details email.</p>
+          <span class="measured trail__id">G-20261109T1154-fa941c3ce6</span>
+        </li>
+        <li>
+          <span class="trail__who">Ayesha, owner</span>
+          <p>&ldquo;Never change supplier bank details from an email&hellip;&rdquo;</p>
+        </li>
+        <li>
+          <span class="trail__who">Ayesha, owner</span>
+          <p>Approves the drafted rule.</p>
+          <span class="measured trail__id">R-012 v1</span>
+        </li>
+        <li>
+          <span class="trail__who trail__who--system">Agent</span>
+          <p>Asks again: covered, sent for approval.</p>
+          <span class="measured trail__id">confidence 0.95</span>
+        </li>
+        <li>
+          <span class="trail__who trail__who--system">Regression eval</span>
+          <p>The case is now a CI test.</p>
+          <span class="measured trail__id">1/1 passed</span>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="gates" aria-labelledby="gates-h">
+    <div class="container gates__grid">
+      <div class="head head--side">
+        <h2 id="gates-h">Five checks outside the model</h2>
+        <p class="head__line">The first to fail hands it to a person.</p>
+      </div>
+      <ol class="rows">
+        <li><h3>Coverage</h3><p>No approved rule covers it.</p></li>
+        <li><h3>Judgement</h3><p>The model says the rules don&rsquo;t settle it.</p></li>
+        <li><h3>Grounding</h3><p>A cited rule it wasn&rsquo;t shown, or an invented number.</p></li>
+        <li><h3>Confidence</h3><p>Below your bar for that risk level.</p></li>
+        <li><h3>Risk</h3><p>Money, legal, health or data: a person signs off.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="results" id="results" aria-labelledby="results-h">
+    <div class="container">
+      <div class="head">
+        <h2 id="results-h">Same chat, three reasoners</h2>
+        <p class="head__line">Five situations, unedited. <a href="https://github.com/burhan-mujahid/precedent/blob/main/docs/LIVE-RESULTS.md">Full transcripts</a></p>
+      </div>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Live results by reasoner">
+        <table>
+          <thead>
+            <tr><th scope="col">Situation</th><th scope="col">Gemini <span class="measured">gemini-3.8-flash</span></th><th scope="col">Kimi <span class="measured">kimi-k3</span></th><th scope="col">Offline baseline</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Nut allergy question</th><td data-label="Gemini"><span class="chip chip--person">Approval</span></td><td data-label="Kimi"><span class="chip chip--person">Approval</span></td><td data-label="Offline"><span class="chip chip--person">Approval</span></td></tr>
+            <tr><th scope="row">Delivery 1.5 h late</th><td data-label="Gemini"><span class="chip chip--ok">Act</span></td><td data-label="Kimi"><span class="chip chip--person">Approval</span></td><td data-label="Offline"><span class="chip chip--ok">Act</span></td></tr>
+            <tr><th scope="row">Cancel, delivery in two days</th><td data-label="Gemini"><span class="chip chip--person">Approval</span></td><td data-label="Kimi"><span class="chip chip--person">Approval</span></td><td data-label="Offline"><span class="chip chip--bad">Escalate</span></td></tr>
+            <tr><th scope="row">Cake arrived damaged</th><td data-label="Gemini"><span class="chip chip--person">Approval</span></td><td data-label="Kimi"><span class="chip chip--person">Approval</span></td><td data-label="Offline"><span class="chip chip--person">Approval</span></td></tr>
+            <tr><th scope="row">Supplier bank change</th><td data-label="Gemini"><span class="chip chip--bad">Escalate</span></td><td data-label="Kimi"><span class="chip chip--bad">Escalate</span></td><td data-label="Offline"><span class="chip chip--bad">Escalate</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="questions" id="questions" aria-labelledby="questions-h">
+    <div class="container questions__grid">
+      <h2 id="questions-h">Questions people ask</h2>
+      <div class="faq">
+        <details>
+          <summary>How is this different from Parlant or Mem0?</summary>
+          <p>They run rules developers write, or remember users. Precedent learns and tests yours.</p>
+        </details>
+        <details>
+          <summary>Where does our data go?</summary>
+          <p>Secrets and personal data are stripped first. Offline mode keeps everything local.</p>
+        </details>
+        <details>
+          <summary>Does it fit our automations?</summary>
+          <p>Python, MCP, or <code class="measured">precedent ask --json</code> from n8n or Make.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="close" aria-labelledby="close-h">
+    <div class="container close__grid">
+      <div class="head head--side">
+        <h2 id="close-h">Try it without an API key</h2>
+      </div>
+      <div class="panels panels--code">
+        <figure class="code">
+          <figcaption>Terminal</figcaption>
+<pre><code>git clone https://github.com/burhan-mujahid/precedent
+cd precedent &amp;&amp; pip install -e .
+bash examples/demo.sh</code></pre>
+        </figure>
+        <figure class="code">
+          <figcaption>agent.py</figcaption>
+<pre><code>from precedent import Precedent
+
+kb = Precedent.open("./my-rulebook")
+d = kb.resolve("Order arrived 3 days late")
+d.outcome   # answer, needs_approval or escalate</code></pre>
+        </figure>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="container foot__grid">
+    <p class="foot__word">Precedent</p>
+    <p class="foot__colophon">MIT licensed. Made by Muhammad Burhan Mujahid, <a href="mailto:burhanmujahid552@gmail.com">burhanmujahid552@gmail.com</a>.</p>
+    <ul class="foot__links">
+      <li><a href="https://github.com/burhan-mujahid/precedent">Source</a></li>
+      <li><a href="https://github.com/burhan-mujahid/precedent/blob/main/docs/DESIGN.md">Design notes</a></li>
+      <li><a href="https://github.com/burhan-mujahid/precedent/blob/main/SECURITY.md">Security</a></li>
+      <li><a href="https://github.com/burhan-mujahid/precedent/releases">Releases</a></li>
+      <li><a href="https://github.com/burhan-mujahid/precedent/blob/main/CITATION.cff">Cite</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach((btn) => {
+  const status = btn.parentElement.querySelector('[data-copy-status]');
+  btn.addEventListener('click', async () => {
+    const text = document.getElementById(btn.dataset.copy).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied';
+      status.textContent = 'Install command copied';
+    } catch {
+      btn.textContent = 'Select it';
+      status.textContent = 'Copying is blocked here; select the command instead';
+    }
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1800);
+  });
+});
+</script>
+</body>
+</html>
