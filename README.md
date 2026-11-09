@@ -103,7 +103,7 @@ YAML rules, JSONL logs. No database, no vector store, no server. Review rule cha
 No API key needed. Python 3.10+.
 
 ```bash
-pip install "git+https://github.com/burhan-mujahid/precedent"
+pip install "git+https://github.com/burhan-mujahid/precedent@v0.2.0"
 ```
 
 **See the whole loop in about 20 seconds** on a sample bakery WhatsApp group:
