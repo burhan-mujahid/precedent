@@ -8,7 +8,9 @@ abstract: >-
   rules grounded in the source messages, requires a person to approve every change, and
   gates each agent action through deterministic checks outside the model (coverage,
   judgement, grounding, risk-tiered confidence, risk), returning act, needs-approval or
-  escalate. Every escalation becomes a draft rule and a regression test; drift detection
+  escalate. A second, execution gate re-checks each step and the result after the action is
+  done, and halts a running action that goes beyond its decision, recording which rule, which
+  run and who halted it. Every escalation becomes a draft rule and a regression test; drift detection
   flags stale, overridden, unused and duplicate rules. It runs as a Python library, CLI,
   MCP server, or compiles to Agent Skills and AGENTS.md.
 authors:
@@ -18,7 +20,7 @@ authors:
 repository-code: "https://github.com/burhan-mujahid/precedent"
 url: "https://github.com/burhan-mujahid/precedent"
 license: MIT
-version: 0.1.0
+version: 0.2.0
 date-released: "2026-11-09"
 keywords:
   - AI agents

@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Precedent: your team’s rules, enforced before every agent action</title>
-  <meta name="description" content="Precedent turns your team's chat into rules a person approves, and checks them before any AI agent acts. Open source, MIT, works offline.">
+  <title>Precedent: your team’s rules, enforced before and during every agent action</title>
+  <meta name="description" content="Precedent turns your team's chat into rules a person approves, checks them before any AI agent acts, and halts a running action that goes beyond what was approved. Open source, MIT, works offline.">
   <link rel="canonical" href="https://burhan-mujahid.github.io/precedent/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Precedent">
   <meta property="og:title" content="Precedent: agents ask first, people decide">
-  <meta property="og:description" content="Your team&rsquo;s chat, turned into approved rules every AI agent checks before acting. Act, needs approval or escalate, decided by gates outside the model.">
+  <meta property="og:description" content="Your team&rsquo;s chat, turned into approved rules every AI agent checks before acting. Act, needs approval or escalate before it starts; continue or halt at every step after.">
   <meta property="og:url" content="https://burhan-mujahid.github.io/precedent/">
   <meta property="og:image" content="https://burhan-mujahid.github.io/precedent/social-preview.png">
   <meta property="og:image:width" content="1280">
@@ -24,7 +24,8 @@
   <link rel="stylesheet" href="style.css">
   <script type="application/ld+json">
   {"@context": "https://schema.org", "@type": "SoftwareSourceCode", "name": "Precedent",
-   "description": "Human-approved operating rules and deterministic action gates for AI agents, mined from team chat.",
+   "description": "Human-approved operating rules and deterministic action gates for AI agents, mined from team chat. Halts running actions that go beyond what was approved.",
+   "softwareVersion": "0.2.0",
    "codeRepository": "https://github.com/burhan-mujahid/precedent", "programmingLanguage": "Python", "license": "https://opensource.org/licenses/MIT",
    "author": {"@type": "Person", "name": "Muhammad Burhan Mujahid"}}
   </script>
@@ -37,6 +38,7 @@
     <nav class="mast__nav" aria-label="Page">
       <a href="#decisions">Decisions</a>
       <a href="#loop">The loop</a>
+      <a href="#halt">Halts</a>
       <a href="#results">Results</a>
       <a href="#questions">Questions</a>
       <a class="mast__gh" href="https://github.com/burhan-mujahid/precedent">GitHub</a>
@@ -151,6 +153,43 @@
     </div>
   </section>
 
+  <section class="loop" id="halt" aria-labelledby="halt-h">
+    <div class="container loop__grid">
+      <div class="head head--side">
+        <h2 id="halt-h">Then every step is checked again</h2>
+        <p class="head__line">Approving the start isn&rsquo;t enough. A step beyond the decision halts the whole run, and the halt leaves a record.</p>
+        <p class="head__line head__credit">Added in 0.2 after <a href="https://www.linkedin.com/in/gary-ko-976863210/">Gary Ko</a> asked where the halt was.</p>
+      </div>
+      <ol class="trail">
+        <li>
+          <span class="trail__who">Ayesha, owner</span>
+          <p>Signs off the damaged cake refund.</p>
+          <span class="measured trail__id">R-003 v1</span>
+        </li>
+        <li>
+          <span class="trail__who trail__who--system">Agent</span>
+          <p>Asks the customer for a photo. <span class="chip chip--ok">Continue</span></p>
+          <span class="measured trail__id">run-cake</span>
+        </li>
+        <li>
+          <span class="trail__who trail__who--system">Agent</span>
+          <p>&ldquo;Refunding 5000 to the customer&rsquo;s card.&rdquo; No rule or decision mentioned 5000. <span class="chip chip--bad">Halt</span></p>
+          <span class="measured trail__id">H-20261109T1428-e1f2fb8921</span>
+        </li>
+        <li>
+          <span class="trail__who trail__who--system">Agent</span>
+          <p>Checks again after Done: the run stays halted. <span class="chip chip--bad">Halt</span></p>
+          <span class="measured trail__id">same halt</span>
+        </li>
+        <li>
+          <span class="trail__who trail__who--system">Halt record</span>
+          <p>Rule R-003 v1, run run-cake, during the action, created by precedent:check. A gap opens for the owner.</p>
+          <span class="measured trail__id">G-20261109T1428-80363d1ecc</span>
+        </li>
+      </ol>
+    </div>
+  </section>
+
   <section class="results" id="results" aria-labelledby="results-h">
     <div class="container">
       <div class="head">
@@ -183,6 +222,10 @@
           <p>They run rules developers write, or remember users. Precedent learns and tests yours.</p>
         </details>
         <details>
+          <summary>What if the agent goes further than what was approved?</summary>
+          <p>It re-checks before each step and after Done. A new amount, a riskier action, a changed rule or a stale approval halts the run for good.</p>
+        </details>
+        <details>
           <summary>Where does our data go?</summary>
           <p>Secrets and personal data are stripped first. Offline mode keeps everything local.</p>
         </details>
@@ -211,8 +254,10 @@ bash examples/demo.sh</code></pre>
 <pre><code>from precedent import Precedent
 
 kb = Precedent.open("./my-rulebook")
-d = kb.resolve("Order arrived 3 days late")
-d.outcome   # answer, needs_approval or escalate</code></pre>
+d = kb.resolve("Order arrived 3 days late", run_id="run-42")
+d.outcome   # answer, needs_approval or escalate
+
+kb.check(d.id, "Refunding the delivery fee").outcome   # continue or halt</code></pre>
         </figure>
       </div>
     </div>

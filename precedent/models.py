@@ -23,6 +23,24 @@ ANSWER = "answer"
 ESCALATE = "escalate"
 NEEDS_APPROVAL = "needs_approval"
 
+# Outcomes of the execution gate (guard.check), called while an action runs and after it is done.
+CONTINUE = "continue"
+HALT = "halt"
+STAGES = ("during", "after")
+
+# Why a running action was halted.
+HALT_REASONS = (
+    "unknown_decision",  # the agent is acting on a decision id the rulebook never issued
+    "halted",            # this decision or its run was already halted; halts are sticky
+    "not_authorized",    # the decision was escalate: the action should never have started
+    "no_sign_off",       # needs_approval, but no person has signed it off
+    "already_done",      # the action was already checked after Done: one decision, one action
+    "expired",           # the decision (or its sign-off) is older than runtime.decision_ttl_minutes
+    "rule_changed",      # a cited rule was edited or retired after the decision was made
+    "out_of_scope",      # the step uses an amount the decision did not authorise
+    "external",          # a person or an outside probe halted it
+)
+
 # Why an agent was not allowed to act on its own. Every one of these opens a gap.
 GAP_REASONS = (
     "no_coverage",      # nothing in the rulebook is about this situation
@@ -32,6 +50,7 @@ GAP_REASONS = (
     "ungrounded",       # the model cited rules it was not given
     "human_override",   # a person overrode a decision after the fact
     "reasoner_error",   # the model call failed (outage, quota, bad reply): fail closed
+    "halted",           # a running action was halted (out of scope, or by a person or probe)
 )
 
 
@@ -233,6 +252,7 @@ class Decision:
     considered: list[str] = field(default_factory=list)
     gap_id: str | None = None
     provider: str = ""
+    run_id: str | None = None        # groups the decisions of one agent run, so a halt can stop all of it
 
     @property
     def ok(self) -> bool:
@@ -267,4 +287,30 @@ class Gap:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Gap:
+        return _from_dict(cls, d)
+
+
+@dataclass
+class Halt:
+    """The record of a halted action: which decision, which run, which rule versions, at what stage,
+    why, and who created it. Appended to logs/events.jsonl and never edited."""
+
+    id: str
+    ts: str
+    decision_id: str
+    reason: str                      # one of HALT_REASONS
+    stage: str = "during"            # during | after
+    run_id: str | None = None
+    detail: str = ""
+    by: str = ""                     # precedent:check for automatic halts; the person or probe otherwise
+    step: str = ""                   # what the agent was doing or reported doing (redacted)
+    rules: list[dict[str, Any]] = field(default_factory=list)   # the decision's cited rules [{id, version, sha}]
+    gap_id: str | None = None
+    proposal_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Halt:
         return _from_dict(cls, d)

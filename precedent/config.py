@@ -40,6 +40,7 @@ DEFAULTS: dict[str, Any] = {
     "runtime": {
         "redact": True,                 # strip personal data and secrets from situations before the model/log
         "max_situation_chars": 4000,    # longer inputs are refused (cost and prompt-injection surface)
+        "decision_ttl_minutes": 60,     # how long a decision (or its sign-off) authorises action
     },
     "retrieval": {
         "top_k": 5,
@@ -104,6 +105,7 @@ class Config:
         number("policy.stale_penalty", 0, 1)
         number("retrieval.min_coverage", 0, 1)
         number("runtime.max_situation_chars", 1, 1_000_000)
+        number("runtime.decision_ttl_minutes", 1, 10_080)
 
     def save(self, path: Path) -> None:
         path.write_text(yaml.safe_dump(self.data, sort_keys=False), encoding="utf-8")

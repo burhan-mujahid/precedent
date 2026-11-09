@@ -233,6 +233,12 @@ def classify_risk(text: str, high_terms: Sequence[str] = (), medium_terms: Seque
     return "low"
 
 
+def high_risk_terms(text: str, high_terms: Sequence[str] = ()) -> set[str]:
+    """The high-risk words in `text` (money, legal, health, deletion, plus the rulebook's own terms)."""
+    low = text.lower()
+    return {m.lower() for m in _HIGH.findall(text)} | {t.lower() for t in high_terms if t.lower() in low}
+
+
 class OfflineReasoner:
     name = "offline"
 

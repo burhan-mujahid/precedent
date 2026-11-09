@@ -26,6 +26,12 @@ when it should not, so every safeguard below fails closed: when in doubt, a pers
 | Rule text in an export adds fields to SKILL.md frontmatter, closes the AGENTS.md markers, or fakes a rule heading | Exported text is flattened to one inert line; the description is a quoted YAML string | `test_exports_cannot_be_hijacked_by_rule_text` |
 | An id like `../../x` reads or writes outside the rulebook | Ids are checked before they become file names | `test_ids_cannot_escape_the_rulebook` |
 | Two reviewers approve at once and get the same rule number | Approvals take a cross-process lock file | `test_concurrent_approvals_get_distinct_rule_ids` |
+| An agent keeps going after the rulebook changed underneath it | `check_action` halts the next step if a cited rule was retired, re-versioned or edited | `test_rule_withdrawn_mid_run_halts_the_next_step`, `test_rule_edited_without_version_bump_halts` |
+| An agent stretches a decision beyond what was approved (a bigger amount, or "change the bank details" on an allergy answer) | A step with an amount or a high-risk word found in neither the decision nor its rules halts as `out_of_scope` | `test_out_of_scope_step_halts_with_an_artifact_and_a_gap`, `test_a_decision_cannot_authorise_a_riskier_step` |
+| An agent reuses one approval for many actions, or days later | A decision closes after its after-Done check (`already_done`) and expires after `runtime.decision_ttl_minutes` (`expired`) | `test_one_decision_covers_one_action`, `test_decisions_expire` |
+| An agent retries past a halt | Halts are final for the decision and its whole run | `test_halts_are_sticky_for_the_decision_and_its_run` |
+| An agent signs off its own high-risk action | There is no sign-off over MCP; a NEEDS APPROVAL decision halts until a person runs `precedent signoff` | `test_agents_cannot_sign_off_over_mcp` |
+| The execution gate errors or gets bad input | `handle_check_call` returns `halt`; it never raises to the agent | `test_bad_inputs` |
 | Oversized inputs (cost, memory) | Situations over `runtime.max_situation_chars` (4000) are refused; MCP lines over 1 MB and model responses over 10 MB are rejected; MCP `limit` is capped at 100 | `test_tool_call_fails_closed` |
 
 ## Personal data and secrets
@@ -55,7 +61,14 @@ when it should not, so every safeguard below fails closed: when in doubt, a pers
   it does not listen on a network port.
 * **It does not stop an agent that never asks.** Precedent is a gate the agent calls. Enforce
   the call in your agent framework (for example, a tool that can only run after
-  `consult_rulebook` returned `answer`).
+  `consult_rulebook` returned `answer` and `check_action` returned `continue`). A halt takes
+  effect at the agent's next check, not mid-way through a single tool call.
+* **Halts can be used to deny service.** Anyone who can call `report_outcome` with `halt`, or
+  write to the rulebook folder, can halt a run. That fails closed, and the halt record says who
+  did it (`mcp:<name>` for anything over MCP).
+* **Scope checks are lexical.** The execution gate compares numbers and a list of high-risk
+  words. A step written in other words ("five thousand", "wire it") can pass. Keep
+  `risk.high_terms` up to date for your domain.
 * **Number grounding is not semantic grounding.** An injected answer with no numbers ("cancel
   the order") that cites a real rule can still pass. Keep money, legal, health and irreversible
   actions on `high` risk, so a person signs off.

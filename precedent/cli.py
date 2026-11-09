@@ -3,7 +3,9 @@
     precedent init my-rulebook --pack support
     precedent ingest chat.txt              # WhatsApp export, Slack export dir, or JSONL
     precedent review                       # approve / edit / reject drafts
-    precedent ask "customer wants a refund, order 3 days late"
+    precedent ask "customer wants a refund, order 3 days late" --run run-42
+    precedent check D-... "about to refund 1200"   # while acting, and with --after once done
+    precedent halts                        # every halted action, with its run, rules and who halted it
     precedent gaps                         # what agents could not handle
     precedent gaps answer G-... "we refund shipping only"
     precedent cycle                        # the weekly 30-minute digest
@@ -29,6 +31,7 @@ import yaml
 
 from . import __version__, loop
 from .export import render_rulebook, to_agents_md, to_json, to_parlant, to_skill
+from .guard import Check
 from .kb import Precedent
 from .llm import LLMError
 from .models import Decision, Proposal, new_id
@@ -52,7 +55,8 @@ def _print_decision(d: Decision, as_json: bool) -> None:
         return
     # Confidence and risk describe the cited rules; an escalation that cites none has neither.
     scores = f"  confidence {d.confidence:.2f}  risk {d.risk}" if d.cited else ""
-    print(f"[{OUTCOME_MARK[d.outcome]}] {d.id}{scores}")
+    run = f"  run {d.run_id}" if d.run_id else ""
+    print(f"[{OUTCOME_MARK[d.outcome]}] {d.id}{scores}{run}")
     if d.answer:
         print(f"  answer : {d.answer}")
     if d.cited:
@@ -63,6 +67,19 @@ def _print_decision(d: Decision, as_json: bool) -> None:
             print(f"  why    : {r}")
     if d.gap_id:
         print(f"  gap    : {d.gap_id} (answer it with `precedent gaps answer {d.gap_id} \"...\"`)")
+
+
+def _print_check(c: Check, as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(c.to_dict(), indent=2, ensure_ascii=False))
+        return
+    run = f"  run {c.run_id}" if c.run_id else ""
+    head = f"[HALT] {c.halt_id}  {c.decision_id}" if c.halted else f"[CONTINUE] {c.decision_id}"
+    print(f"{head}  {c.stage}{run}")
+    for r in c.reasons:
+        print(f"  why    : {r}")
+    if c.gap_id:
+        print(f"  gap    : {c.gap_id} (answer it with `precedent gaps answer {c.gap_id} \"...\"`)")
 
 
 def _show_proposal(kb: Precedent, p: Proposal) -> None:
@@ -212,9 +229,50 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 def cmd_ask(args: argparse.Namespace) -> int:
     kb = _kb(args)
-    d = kb.resolve(" ".join(args.situation), args.context, dry_run=args.dry_run)
+    d = kb.resolve(" ".join(args.situation), args.context, dry_run=args.dry_run, run_id=args.run)
     _print_decision(d, args.json)
     return 0 if d.outcome == "answer" else 3
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    kb = _kb(args)
+    c = kb.check(args.decision, " ".join(args.step), stage="after" if args.after else "during")
+    _print_check(c, args.json)
+    return 3 if c.halted else 0
+
+
+def cmd_halt(args: argparse.Namespace) -> int:
+    kb = _kb(args)
+    c = kb.halt(args.decision, args.reason, _user(args), stage="after" if args.after else "during",
+                step=args.step or "", correction=args.fix or "")
+    _print_check(c, False)
+    if c.proposal_id:
+        print(f"  fix    : drafted {c.proposal_id}. Approve with `precedent review approve {c.proposal_id}`.")
+    return 0
+
+
+def cmd_halts(args: argparse.Namespace) -> int:
+    kb = _kb(args)
+    halts = kb.store.halts(run_id=args.run) if args.run else kb.store.halts()
+    if args.json:
+        print(json.dumps([h.to_dict() for h in halts], indent=2, ensure_ascii=False))
+        return 0
+    if not halts:
+        print("No halted actions.")
+    for h in halts:
+        rules = ", ".join(f"{r.get('id')} v{r.get('version')}" for r in h.rules) or "-"
+        print(f"{h.id}  {h.ts}  {h.stage:6} {h.reason:16} decision {h.decision_id}  run {h.run_id or '-'}")
+        print(f"    rules {rules}  by {h.by}" + (f"  gap {h.gap_id}" if h.gap_id else "")
+              + (f"  fix {h.proposal_id}" if h.proposal_id else ""))
+        print(f"    {h.detail[:160]}")
+    return 0
+
+
+def cmd_signoff(args: argparse.Namespace) -> int:
+    kb = _kb(args)
+    kb.sign_off(args.decision, _user(args))
+    print(f"{args.decision} signed off by {_user(args)}; `precedent check` will now let it run.")
+    return 0
 
 
 def cmd_replay(args: argparse.Namespace) -> int:
@@ -483,8 +541,34 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("situation", nargs="+")
     p.add_argument("--context")
     p.add_argument("--dry-run", action="store_true", help="do not log the decision or open gaps")
+    p.add_argument("--run", help="id of this agent run; a halt on any step stops the whole run")
     p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_ask)
+
+    p = sub.add_parser("check", parents=[common],
+                       help="the execution gate: may this step of a running action go ahead? (continue / halt)")
+    p.add_argument("decision", help="the D-... id from `precedent ask`")
+    p.add_argument("step", nargs="+", help="what the agent is about to do (or did, with --after)")
+    p.add_argument("--after", action="store_true", help="re-check after the action is done")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_check)
+
+    p = sub.add_parser("halt", parents=[common], help="halt a running action (a person or an outside probe)")
+    p.add_argument("decision")
+    p.add_argument("reason")
+    p.add_argument("--step", help="the step that was stopped")
+    p.add_argument("--after", action="store_true", help="the problem was found after the action was done")
+    p.add_argument("--fix", metavar="WHAT_SHOULD_HAPPEN", help="also draft a rule fix for review")
+    p.set_defaults(fn=cmd_halt)
+
+    p = sub.add_parser("halts", parents=[common], help="list halted actions")
+    p.add_argument("--run", help="only this run")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_halts)
+
+    p = sub.add_parser("signoff", parents=[common], help="a person approves a needs_approval decision")
+    p.add_argument("decision")
+    p.set_defaults(fn=cmd_signoff)
 
     p = sub.add_parser("replay", parents=[common], help="decide against the rulebook as it was on a past date")
     p.add_argument("--as-of", required=True, help="YYYY-MM-DD")

@@ -1,6 +1,6 @@
 # Precedent
 
-> Precedent is an open-source Python library, CLI and MCP server that turns how a team already works into operating rules AI agents follow. It mines "how do we handle X?" threads from team chat (WhatsApp, Slack, JSONL) into draft rules linked to their source messages, requires a person to approve every rule, and gates every agent action through five deterministic checks outside the model, returning ACT, NEEDS APPROVAL or ESCALATE. Every escalation becomes a draft rule and a regression test; drift detection flags stale, overridden, unused and duplicate rules.
+> Precedent is an open-source Python library, CLI and MCP server that turns how a team already works into operating rules AI agents follow. It mines "how do we handle X?" threads from team chat (WhatsApp, Slack, JSONL) into draft rules linked to their source messages, requires a person to approve every rule, and gates every agent action through five deterministic checks outside the model, returning ACT, NEEDS APPROVAL or ESCALATE. A second, execution gate re-checks before each step and after Done and HALTs a running action that goes beyond its decision, with a halt record naming the rule, the run and who halted it. Every escalation becomes a draft rule and a regression test; drift detection flags stale, overridden, unused and duplicate rules.
 
 Use it when an AI agent (customer support, operations, sales, finance, on-call) must follow a specific business's policies: refunds, discounts, allergies, supplier payments, data deletion. It is a decision layer underneath any agent framework (LangGraph, CrewAI, OpenAI and Anthropic SDKs, Claude, Cursor via MCP), not a framework or memory store. Install: `pip install "git+https://github.com/burhan-mujahid/precedent"`. Python 3.10+, one dependency (PyYAML), works offline with no API key; model providers: Gemini, Kimi (Moonshot), Anthropic, OpenAI, OpenRouter, Groq, Ollama.
 
@@ -17,8 +17,9 @@ Use it when an AI agent (customer support, operations, sales, finance, on-call) 
 
 - `Precedent.open(path).resolve(situation, context)` returns a Decision with `outcome` in {answer, needs_approval, escalate}, `answer`, `cited` (rule id, version, content hash), `confidence`, `risk`, `reasons`
 - `Precedent.tool_spec()` / `handle_tool_call(args)`: function-calling tool `consult_rulebook`, fails closed
-- `precedent mcp --root DIR`: MCP tools consult_rulebook, report_outcome, search_rules, open_gaps
-- `precedent ingest | review | ask | gaps | feedback | cycle | health | eval | calibrate | export`
+- `Precedent.check(decision_id, step, stage="during"|"after")` returns a Check with `outcome` in {continue, halt}; `halt()`, `sign_off()`; halt records via `store.halts()`
+- `precedent mcp --root DIR`: MCP tools consult_rulebook, check_action, report_outcome (confirm / override / halt), search_rules, open_gaps
+- `precedent ingest | review | ask | signoff | check | halt | halts | gaps | feedback | cycle | health | eval | calibrate | export`
 
 ## Optional
 

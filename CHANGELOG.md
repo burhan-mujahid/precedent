@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.0 - 2026-11-09
+
+Execution gate: halt an action that is already running, and re-check after Done. Thanks to
+[Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/), who pointed out that act / needs approval / escalate only gate the next action and none
+of them is a HALT.
+
+* `check_action` (MCP), `kb.check()`, `precedent check`: called before each step and after Done; returns
+  `continue` or `halt`. Deterministic checks, no model call: unknown decision, already halted (decision or
+  run), already done, not authorised / no sign-off, expired, cited rule changed, out of scope (an amount or a
+  high-risk word that is in neither the decision nor its rules).
+* Halt records in `logs/events.jsonl`: decision, run, cited rule versions, stage (during / after), reason,
+  and who created it (`precedent:check`, a person, or `mcp:<probe>`). `precedent halts` lists them.
+* Halts are final: a halted decision or run stays halted. One decision covers one action.
+* `run_id` on `resolve()`, `consult_rulebook` and `precedent ask --run`, so a halt stops the whole run.
+* Sign-off for NEEDS APPROVAL decisions: `precedent signoff`, `kb.sign_off()`. Not available over MCP, so
+  agents cannot approve themselves.
+* `report_outcome` verdict `halt` and `precedent halt --fix`: an outside monitor's halt becomes a halt
+  record, a gap, and a draft rule fix; approving the fix adds a regression case.
+* New setting `runtime.decision_ttl_minutes` (default 60, range-checked).
+* Drift: halts for out-of-scope or external reasons count towards a rule's "overridden" finding; the weekly
+  digest and `health` report halts in the last 30 days.
+
 ## 0.1.0 - 2026-11-09
 
 First public release.

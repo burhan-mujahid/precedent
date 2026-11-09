@@ -61,6 +61,15 @@ precedent ask "<situation in plain words, with amounts and timing>" --json --roo
 
 Never act on a business situation when the outcome is not `answer`, and never treat the rulebook as permission for something it does not say.
 
+While acting (pass `--run <id>` to `ask` so the run can be halted as a whole):
+
+```bash
+precedent check <D-id> "<the step you are about to take, with amounts>" --root <dir>          # before each step
+precedent check <D-id> "<what you did>" --after --root <dir>                                    # once, after Done
+```
+
+Exit 0 = continue. Exit 3 = **halt**: stop at once, change nothing else, and tell the person. Never sign off a decision yourself; `precedent signoff <D-id>` is for the person. If the person (or a monitor) wants to stop a run: `precedent halt <D-id> "<why>" [--fix "<what should happen>"] --root <dir>`.
+
 ## 5. Close the loop
 
 * A person tells you what should happen for an escalated case:

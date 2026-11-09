@@ -48,10 +48,16 @@ question never escalates twice."*
 **7. Override (1 min).** A person corrects the allergy answer after the fact. That opens a gap
 and drafts an update to R-009. *"Mistakes turn into fixes, through the same approval door."*
 
-**8. Weekly digest (1 min).** `precedent cycle`: *"Thirty minutes a week for the owner: answer the
+**8. Halt a running action (1 min).** The owner signs off the damaged-cake refund, and the agent
+starts. Asking for a photo: continue. "Refund 5000": HALT, because no rule or decision mentioned
+5000. The after-Done check stays halted, and `precedent halts` shows the record: which rule
+version, which run, and who halted it. *"Approving the start isn't enough. Every step is
+re-checked, and a halt is final."*
+
+**9. Weekly digest (1 min).** `precedent cycle`: *"Thirty minutes a week for the owner: answer the
 clusters, review drafts, check drift."*
 
-**9. Export (30 s).** *"Use it from Claude or Cursor over MCP, from Python, from LangGraph, or
+**10. Export (30 s).** *"Use it from Claude or Cursor over MCP, from Python, from LangGraph, or
 compile it into an Agent Skill or AGENTS.md."*
 
 **Close.** Open the rulebook folder: YAML and JSONL. *"Plain files in git. Rule changes go through
@@ -69,6 +75,17 @@ pull requests, and CI blocks a change that breaks a regression case."*
 * **ACE, Hermes skills** let the *agent* evolve its own playbook from its own attempts. Precedent
   deliberately never lets a model change the rules; it learns from *people's* answers, and treats
   the agent's uncertainty as a request for one.
+
+### "Approving the start isn't the same as stopping it. Where's the halt?"
+
+Right, and that's a separate gate. `consult_rulebook` decides whether an action may start.
+`check_action` runs before each step and after Done. It halts if the step uses an amount or a
+high-risk word the decision never covered, if a cited rule changed mid-run, if the decision
+expired or was already used, or if a high-risk action was never signed off. The halt record names
+the decision, the run, the rule versions, the stage and who halted it (`precedent halts`). A halted
+run stays halted. If your own monitor halts a run, it reports it with `report_outcome` →
+`halt`, and that halt becomes a draft rule fix and a regression test. (This gate exists because
+Gary Ko asked exactly this question about v0.1.0.)
 
 ### "What if the model is wrong?"
 
@@ -119,7 +136,7 @@ sets them from evidence.
 | n8n / Make / cron / shell | `precedent ask "…" --json`: exit code 0 only when the agent may act alone |
 | A static agent config | `precedent export skill` or `agents` |
 
-There's no hosted HTTP API in v0.1. For workflow tools without a command step, a thin HTTP wrapper
+There's no hosted HTTP API yet. For workflow tools without a command step, a thin HTTP wrapper
 around `handle_tool_call` is a few lines; it's on the roadmap with direct Slack and WhatsApp
 Business connectors.
 

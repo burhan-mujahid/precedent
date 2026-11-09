@@ -7,7 +7,7 @@
       proposals/P-....yaml       suggested changes waiting for review
       sources/episodes.jsonl     mined Q&A episodes (redacted)
       logs/decisions.jsonl       append-only: every answer the runtime gave
-      logs/events.jsonl          append-only: gaps opened/resolved, feedback
+      logs/events.jsonl          append-only: gaps opened/resolved, feedback, sign-offs, checks, halts
       evals/golden.jsonl         regression cases built from resolved gaps
       RULEBOOK.md                rendered, human-readable view
 
@@ -32,7 +32,7 @@ from typing import Any
 import yaml
 
 from .config import Config
-from .models import Decision, Gap, Proposal, Rule, iso, utcnow, valid_id
+from .models import Decision, Gap, Halt, Proposal, Rule, iso, utcnow, valid_id
 
 _GAP_STATUS = {"gap_answered": "answered", "gap_resolved": "resolved", "gap_dismissed": "dismissed"}
 
@@ -305,6 +305,21 @@ class Store:
             if g.id == gid:
                 return g
         raise StoreError(f"unknown gap {gid}")
+
+    # ---------- execution gate ----------
+    def halts(self, *, decision_id: str | None = None, run_id: str | None = None) -> list[Halt]:
+        """Halt records, oldest first. With both filters, a halt matching either one is returned."""
+        out = [Halt.from_dict(e["halt"]) for e in self.events("halt") if isinstance(e.get("halt"), dict)]
+        if decision_id is None and run_id is None:
+            return out
+        return [h for h in out if (decision_id and h.decision_id == decision_id) or (run_id and h.run_id == run_id)]
+
+    def sign_off_of(self, decision_id: str) -> dict[str, Any] | None:
+        """The sign-off event for a needs_approval decision, if a person recorded one."""
+        for e in self.events("decision_signed_off"):
+            if e.get("decision_id") == decision_id:
+                return e
+        return None
 
     # ---------- evals ----------
     def add_golden(self, case: dict[str, Any]) -> None:

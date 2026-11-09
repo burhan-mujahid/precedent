@@ -36,6 +36,9 @@
 
 <p align="center"><sub>Real output from <code>bash examples/demo.sh</code> (offline, no API key). Long lines shortened to fit.</sub></p>
 
+> [!NOTE]
+> **New in 0.2: halting a run that's already going.** Approving the start of an action isn't enough. Agents now re-check before every step and after Done, and Precedent **halts** the run when a step goes beyond what was approved, a rule changes mid-run, or a decision is reused or stale. Each halt leaves a record of which rule, which run, and who halted it. [How it works](#-the-execution-gate-halting-a-run-thats-already-going) · prompted by [Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/).
+
 ## 🧭 The problem
 
 Every agent deployment hits the same wall: the agent is capable, but it doesn't know the house rules.
@@ -68,8 +71,8 @@ There is exactly **one door** into the rulebook: an approved proposal. Models dr
 <tr>
 <td valign="top">
 
-### 🚦 A gate before every action
-Agents call `consult_rulebook` before acting. **Five deterministic gates outside the model** return one of three outcomes: act, ask a human to approve, or escalate.
+### 🚦 A gate before every action, and while it runs
+Agents call `consult_rulebook` before acting. **Five deterministic gates outside the model** return one of three outcomes: act, ask a human to approve, or escalate. Then `check_action` re-checks **before each step and after Done**, and **halts** the run if the step goes beyond what was approved.
 
 </td>
 <td valign="top">
@@ -100,7 +103,7 @@ YAML rules, JSONL logs. No database, no vector store, no server. Review rule cha
 No API key needed. Python 3.10+.
 
 ```bash
-pip install "git+https://github.com/burhan-mujahid/precedent@v0.1.0"
+pip install "git+https://github.com/burhan-mujahid/precedent"
 ```
 
 **See the whole loop in about 20 seconds** on a sample bakery WhatsApp group:
@@ -158,6 +161,12 @@ flowchart LR
     GATES --> APP["🟡 NEEDS APPROVAL<br/>high-risk: a human signs off"]
     GATES --> ESC["🔴 ESCALATE<br/>logged as a gap"]
     ESC --> G
+
+    ACT -- "each step + after Done" --> CHK{"🛑 check_action"}
+    APP -- "after sign-off" --> CHK
+    CHK --> CONT["continue"]
+    CHK --> HALT["HALT<br/>halt record · run stopped"]
+    HALT -- "a person answers once" --> G
 ```
 
 ### The five gates
@@ -172,6 +181,35 @@ Every `consult_rulebook` call goes through these, in order. The first failure wi
 | 4 | **Confidence** | confidence is below the threshold for the rule's risk tier | thresholds are yours to set, and `precedent calibrate` sets them from evidence |
 | 5 | **Risk** | the rule is high-risk (money, legal, health, personal data, irreversible) | → **NEEDS APPROVAL**: the agent prepares, a person signs off |
 
+### 🛑 The execution gate: halting a run that's already going
+
+The five gates decide whether an action may **start**. They can't stop one that's already running, and they never see what actually happened. So there is a second gate. While acting, the agent calls `check_action` (or `kb.check`, or `precedent check`) with its decision id before each step that changes something, and once more after Done. Every call returns **continue** or **halt**. None of the checks calls a model.
+
+| # | Check | Halts when | Reason |
+|:-:|---|---|---|
+| 1 | **Known** | the agent cites a decision the rulebook never issued | `unknown_decision` |
+| 2 | **Sticky** | this decision, or any decision in the same run, was halted before | `halted` |
+| 3 | **Single use** | the decision already passed its after-Done check | `already_done` |
+| 4 | **Authorised** | the decision was ESCALATE, or NEEDS APPROVAL with no sign-off recorded | `not_authorized`, `no_sign_off` |
+| 5 | **Fresh** | the decision, or its sign-off, is older than `runtime.decision_ttl_minutes` (60) | `expired` |
+| 6 | **Rules unchanged** | a cited rule was retired, re-versioned or edited since the decision | `rule_changed` |
+| 7 | **In scope** | the step uses an amount, or a high-risk word (bank, refund, delete…), that's in neither the decision nor its rules | `out_of_scope` |
+
+Every halt is a **halt record** in `logs/events.jsonl`: the decision, the run, the cited rule versions, the stage (`during` or `after`), the reason, and **who created it**. That's `precedent:check` for the checks above, or the person or probe that called `precedent halt`. Halts are final. Once a run is halted, every later check in it halts too, so an agent can't retry its way past one. Out-of-scope and external halts also open a gap, so a person's answer becomes a rule fix and a regression test.
+
+```text
+> check: Refunding 5000 to the customer's card
+[HALT] H-20261109T1428-e1f2fb8921  D-20261109T1428-2ed8117143  during  run run-cake
+  why    : out_of_scope: the step uses 5000, which the decision did not authorise
+  gap    : G-20261109T1428-80363d1ecc
+
+> check: Refunded the cake in full
+[HALT] H-20261109T1428-e1f2fb8921  D-20261109T1428-2ed8117143  after  run run-cake
+  why    : halted: H-20261109T1428-e1f2fb8921 (out_of_scope) already stopped this decision; a person starts a new run
+```
+
+**Bring your own monitor.** If something outside Precedent halts a run, such as an execution monitor or a person watching, it calls `report_outcome` with `verdict: "halt"` (or `precedent halt D-… "why" --fix "what should happen"`). Precedent records the halt, stops the rest of the run, opens a gap and drafts the rule fix. Approving the fix adds a regression case.
+
 ## 🔌 Plug it into your agent
 
 Precedent isn't an agent framework or a memory store. It's the **decision layer underneath** whatever you already use.
@@ -183,17 +221,23 @@ Precedent isn't an agent framework or a memory store. It's the **decision layer 
 from precedent import Precedent
 
 kb = Precedent.open("./my-rulebook")
-d = kb.resolve("Customer wants a refund, order arrived 3 days late", context={"order_value": 4500})
+d = kb.resolve("Customer wants a refund, order arrived 3 days late", context={"order_value": 4500},
+               run_id="run-42")
 
 if d.outcome == "answer":            # act; d.cited == [{"id": "R-004", "version": 2, "sha": "f1733b9bf477"}]
     ...
-elif d.outcome == "needs_approval":  # covered, but high risk: a human signs off
+elif d.outcome == "needs_approval":  # covered, but high risk: a human signs off (kb.sign_off(d.id, "owner"))
     ...
 else:                                # "escalate": a gap was logged and will come back as a rule
     ...
+
+# While acting: before each step, and once after Done
+if kb.check(d.id, "Refunding 4500 to the original card").halted:
+    stop_the_run()
+kb.check(d.id, "Refunded 4500", stage="after")
 ```
 
-For function-calling APIs, `kb.tool_spec()` gives a JSON Schema tool definition and `kb.handle_tool_call(args)` runs it. The tool call **never raises**: any error comes back as `escalate` with "Do NOT act". Ready-made snippets: [Anthropic tool use](examples/integrations/anthropic_tool_use.py) · [LangGraph](examples/integrations/langgraph_tool.py).
+For function-calling APIs, `kb.tool_spec()` gives a JSON Schema tool definition and `kb.handle_tool_call(args)` runs it. The tool call **never raises**: any error comes back as `escalate` with "Do NOT act". `kb.check_tool_spec()` and `kb.handle_check_call(args)` do the same for the execution gate, and any error there comes back as `halt`. Ready-made snippets: [Anthropic tool use](examples/integrations/anthropic_tool_use.py) · [LangGraph](examples/integrations/langgraph_tool.py).
 
 </details>
 
@@ -207,7 +251,10 @@ For function-calling APIs, `kb.tool_spec()` gives a JSON Schema tool definition 
 | Tool | What it does |
 |---|---|
 | `consult_rulebook` | the runtime gate: answer / needs_approval / escalate, with cited rule versions and the approved wording |
-| `report_outcome` | confirm (becomes a regression test) or override (drafts a rule fix for human review) |
+| `check_action` | the execution gate, before each step and after Done: continue / halt |
+| `report_outcome` | confirm (becomes a regression test), override (drafts a rule fix for human review), or halt (an outside monitor stopped the run: halt record + gap + draft fix) |
+
+Agents can't sign off their own NEEDS APPROVAL decisions: there is no sign-off tool over MCP.
 | `search_rules` | read-only lookup of approved rules |
 | `open_gaps` | what agents couldn't handle, waiting for a human |
 
@@ -287,7 +334,11 @@ One digest, in order of leverage:
 | `precedent init DIR --pack support` | create a rulebook (`precedent packs` lists packs) |
 | `precedent ingest FILE` | mine WhatsApp / Slack / JSONL into rule drafts |
 | `precedent review` | the only way into the rulebook: walk the drafts and approve / edit / reject each (`list`, `show`, `approve`, `reject` for scripts) |
-| `precedent ask "…" [--json]` | the runtime gate |
+| `precedent ask "…" [--run ID] [--json]` | the runtime gate |
+| `precedent signoff D-…` | a person approves a NEEDS APPROVAL decision so it may run |
+| `precedent check D-… "step" [--after] [--json]` | the execution gate: continue (exit 0) or halt (exit 3) |
+| `precedent halt D-… "why" [--fix "…"]` | a person or monitor halts a running action; `--fix` drafts a rule fix |
+| `precedent halts [--run ID]` | every halt: decision, run, rule versions, stage, reason, who created it |
 | `precedent gaps answer G-… "what we do"` | turn an escalation (and similar open ones) into a draft rule |
 | `precedent feedback D-… --confirm` | a correct decision becomes a regression case |
 | `precedent feedback D-… --override "…"` | a wrong decision opens a gap and drafts a fix to the rule it cited |
@@ -342,6 +393,7 @@ policy:
 runtime:
   redact: true                # strip personal data and secrets before the model and the log
   max_situation_chars: 4000
+  decision_ttl_minutes: 60    # how long a decision (or its sign-off) authorises action
 retrieval: { top_k: 5, min_coverage: 0.30 }
 rules:     { review_days: 90 }
 drift:     { unused_days: 60, override_limit: 2, duplicate_similarity: 0.6 }
@@ -359,6 +411,7 @@ Precedent's job is deciding when an agent may act alone, so it's built to **fail
 
 - 🧱 **The model is untrusted.** It can only cite rules it was shown. An answer with a number found in neither the rule nor the situation (a prompt-injected *"refund 5000"*) escalates. Model errors escalate. Agents also receive the approved rule text word for word.
 - 🙈 **Privacy floor.** API keys, tokens, passwords, private keys, emails, phone numbers, card and IBAN numbers, IPs and URL query strings are redacted **before anything is stored or sent to a model**, both at ingest and at runtime. Use `ollama` and nothing leaves your machine.
+- 🛑 **Halts are deterministic and final.** The execution gate halts a step that goes beyond its decision, a decision reused after Done or past its lifetime, and any run whose rules changed underneath it. A halted run stays halted.
 - 🧾 **Audit trail.** Every decision records the id, version and content hash of each rule it relied on. Logs are append-only, and any past decision can be replayed against the rulebook as it stood that day.
 - 🔒 **Hardened storage.** Ids are validated before they become file names, approvals take a cross-process lock, API keys only travel over HTTPS, and inputs and responses are size-capped.
 - 🧬 **Supply chain.** One runtime dependency. CI runs `pip-audit`, Actions are pinned to commit SHAs, releases ship with signed build provenance.
@@ -376,7 +429,7 @@ The pieces exist separately; the combination doesn't.
 | Self-improving agents (ACE, Hermes) | the agent's own attempts | the agent | – | – | playbook curation |
 | LLM Wiki pattern | your documents | the LLM writes, people read | – | – | lint |
 | Support SaaS (e.g. Sierra) | ticket resolutions | reviewers | inside a closed product | support only | – |
-| **Precedent** | **your team's own Q&A + escalations** | **a person approves every change** | **✅ 5 deterministic gates** | **✅ automatic** | **stale · overridden · unused · duplicate · coverage** |
+| **Precedent** | **your team's own Q&A + escalations** | **a person approves every change** | **✅ 5 deterministic gates, plus halt during and after** | **✅ automatic** | **stale · overridden · unused · duplicate · coverage** |
 
 Precedent can export to Parlant, so it complements rather than competes. Details and related research: [docs/DESIGN.md §9](docs/DESIGN.md#9-related-work-and-how-precedent-differs).
 
@@ -388,6 +441,7 @@ precedent/
   retrieve.py    dependency-free BM25 + coverage scoring
   reasoner.py    extract / decide / wrap: model-backed and deterministic offline versions
   runtime.py     the five gates
+  guard.py       the execution gate: check during and after an action, halt records, sign-off
   loop.py        mining, review, gaps, feedback, session wrap
   drift.py       health checks           evals.py     regression replay
   calibrate.py   evidence-based thresholds  export.py  Skill / AGENTS.md / Parlant / JSON
@@ -399,7 +453,7 @@ docs/              DESIGN.md · LIVE-RESULTS.md · DEMO.md
 
 ## 📍 Status and limits
 
-**v0.1.0, alpha.** 116 tests, run by CI on Linux (Python 3.10 to 3.13), macOS and Windows; ruff and strict mypy clean. Known limits:
+**v0.2.0, alpha.** 139 tests, run by CI on Linux (Python 3.10 to 3.13), macOS and Windows; ruff and strict mypy clean. Known limits:
 
 - **The offline reasoner is lexical.** It's a deterministic baseline for tests and demos; real deployments should use a model for `extract` and `decide`.
 - **Retrieval is BM25.** It suits rulebooks of tens to low thousands of rules written in the team's own words. Stemming is English-only; Urdu and Roman Urdu chats parse fine, but rules match on exact words. An embedding retriever can drop in behind the same one-method interface.
@@ -418,6 +472,10 @@ pip install -e ".[dev]" && pytest -q && ruff check . && mypy
 
 Live provider tests (skipped without keys): `GEMINI_API_KEY=… MOONSHOT_API_KEY=… pytest -m live`.
 
+## 🙏 Acknowledgements
+
+The execution gate (`check_action`, halt records, sign-off, `report_outcome` halts) exists because [Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/) pushed on the first release. He pointed out that act, needs approval and escalate only gate the *next* action: none of them is a HALT. He asked which rule, in which run, actually halted an in-progress action, and who created the artifact for that halt. In v0.1.0 the honest answer was "nothing does". Now every halt has a record that answers all three. Thank you, Gary.
+
 ## 📚 Citing
 
 If Precedent helps your research or product, please cite it. GitHub's **"Cite this repository"** button (from [CITATION.cff](CITATION.cff)) gives APA and BibTeX:
@@ -427,7 +485,7 @@ If Precedent helps your research or product, please cite it. GitHub's **"Cite th
   author  = {Mujahid, Muhammad Burhan},
   title   = {Precedent: human-approved operating rules and deterministic action gates for AI agents},
   year    = {2026},
-  version = {0.1.0},
+  version = {0.2.0},
   url     = {https://github.com/burhan-mujahid/precedent}
 }
 ```

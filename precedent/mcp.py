@@ -8,7 +8,9 @@ Add to any MCP client (Claude Desktop/Code, Cursor, Hermes, ...):
 
 Tools:
     consult_rulebook   the runtime gate: answer / needs_approval / escalate, with cited rule versions
-    report_outcome     after the fact: confirm (becomes a regression test) or override (becomes a fix)
+    check_action       the execution gate, during and after an action: continue / halt
+    report_outcome     after the fact: confirm (becomes a regression test), override (becomes a fix),
+                       or halt (an outside probe stopped the run: a halt record, a gap, and a draft fix)
     search_rules       read-only lookup of approved rules
     open_gaps          what agents could not handle, for a human to answer
 """
@@ -27,16 +29,24 @@ SUPPORTED_PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 
 
 def _tools() -> list[dict[str, Any]]:
-    consult = Precedent.tool_spec()
+    consult, check = Precedent.tool_spec(), Precedent.check_tool_spec()
     return [
         {"name": consult["name"], "description": consult["description"], "inputSchema": consult["input_schema"]},
+        {"name": check["name"], "description": check["description"], "inputSchema": check["input_schema"]},
         {"name": "report_outcome",
          "description": "Tell the rulebook whether a decision was right. 'confirm' turns it into a regression test; "
-                        "'override' (with the correct action) logs a gap and drafts a rule fix for human review.",
+                        "'override' (with the correct action) logs a gap and drafts a rule fix for human review; "
+                        "'halt' records that a run was stopped (for example by an execution monitor), stops the "
+                        "rest of the run, opens a gap, and with a correction drafts a rule fix.",
          "inputSchema": {"type": "object", "properties": {
              "decision_id": {"type": "string"},
-             "verdict": {"type": "string", "enum": ["confirm", "override"]},
-             "correction": {"type": "string", "description": "Required for override: what should have happened."},
+             "verdict": {"type": "string", "enum": ["confirm", "override", "halt"]},
+             "correction": {"type": "string", "description": "Required for override, optional for halt: what "
+                                                             "should have happened."},
+             "reason": {"type": "string", "description": "Required for halt: why the run was stopped."},
+             "step": {"type": "string", "description": "For halt: the step that was stopped."},
+             "stage": {"type": "string", "enum": ["during", "after"], "description": "For halt: during the "
+                                                                                     "action or after Done."},
              "by": {"type": "string", "description": "Who is reporting (name or role)."}},
              "required": ["decision_id", "verdict"]}},
         {"name": "search_rules",
@@ -75,12 +85,19 @@ class Server:
             raise ValueError("arguments must be an object")
         if name == "consult_rulebook":
             return self.kb.handle_tool_call(args)
+        if name == "check_action":
+            return self.kb.handle_check_call(args)
         if name == "report_outcome":
             verdict = args.get("verdict")
-            if verdict not in ("confirm", "override"):
-                raise ValueError("verdict must be confirm or override")
+            if verdict not in ("confirm", "override", "halt"):
+                raise ValueError("verdict must be confirm, override or halt")
             # Agents cannot vouch for themselves: whatever they claim, the audit trail says it came over MCP.
             by = "mcp:" + str(args.get("by") or "agent")[:80]
+            if verdict == "halt":
+                c = self.kb.halt(_text(args, "decision_id", 64), _text(args, "reason", 1000), by,
+                                 stage=str(args.get("stage") or "during"), step=str(args.get("step") or ""),
+                                 correction=str(args.get("correction") or ""))
+                return {"ok": True, "result": f"halt recorded: {c.halt_id}, gap {c.gap_id}", **c.to_dict()}
             correction = _text(args, "correction") if verdict == "override" else ""
             msg = self.kb.feedback(_text(args, "decision_id", 64), by=by,
                                    confirm=verdict == "confirm", correction=correction)

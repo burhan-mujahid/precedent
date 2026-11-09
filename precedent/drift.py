@@ -3,7 +3,7 @@
 A rulebook drifts in five ways, and each has a signal in data Precedent already keeps:
 
     stale       nobody has re-confirmed the rule within its review window
-    overridden  people keep overriding decisions that cite it           (it is wrong)
+    overridden  people keep overriding, or halting, actions that cite it (it is wrong)
     unused      no agent has cited it for weeks                          (it is dead weight, or retrieval misses it)
     duplicate   two approved rules describe the same situation           (they will diverge)
     coverage    a rising share of situations escalate                    (the business moved on)
@@ -58,6 +58,12 @@ def health(store: Store, now: datetime | None = None) -> tuple[list[Finding], di
         if f.get("verdict") == "override":
             for rid in f.get("rules", []):
                 overrides[rid] += 1
+    # A running action halted for going beyond its rule, or stopped by a person or probe, is an override too.
+    halts = store.halts()
+    for h in halts:
+        if h.reason in ("out_of_scope", "external"):
+            for c in h.rules:
+                overrides[str(c.get("id"))] += 1
 
     unused_days = int(cfg.get("drift.unused_days", 60))
     override_limit = int(cfg.get("drift.override_limit", 2))
@@ -68,7 +74,7 @@ def health(store: Store, now: datetime | None = None) -> tuple[list[Finding], di
                                     f"precedent reconfirm {r.id}   (or edit rules/{r.id}.yaml)"))
         if overrides[r.id] >= override_limit:
             findings.append(Finding("critical", "overridden", r.id,
-                                    f"'{r.title}' was overridden {overrides[r.id]} times",
+                                    f"'{r.title}' was overridden or halted {overrides[r.id]} times",
                                     "review the open proposals that target it"))
         since = last_cited.get(r.id) or _parse(r.updated or r.created or now.isoformat())
         if now - since > timedelta(days=unused_days):
@@ -103,6 +109,7 @@ def health(store: Store, now: datetime | None = None) -> tuple[list[Finding], di
         "answered_30d": sum(1 for d in recent if d.outcome == "answer"),
         "needs_approval_30d": sum(1 for d in recent if d.outcome == "needs_approval"),
         "escalation_rate_30d": round(rate, 3),
+        "halts_30d": sum(1 for h in halts if now - _parse(h.ts) <= timedelta(days=30)),
         "most_cited": cite_count.most_common(5),
     }
     return findings, stats

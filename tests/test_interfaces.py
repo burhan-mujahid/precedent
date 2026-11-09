@@ -61,7 +61,7 @@ def test_mcp_server(seeded):
     assert init["result"]["serverInfo"]["name"] == "precedent"
     assert s.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
     names = {t["name"] for t in _rpc(s, "tools/list")["result"]["tools"]}
-    assert names == {"consult_rulebook", "report_outcome", "search_rules", "open_gaps"}
+    assert names == {"consult_rulebook", "check_action", "report_outcome", "search_rules", "open_gaps"}
     res = _rpc(s, "tools/call", {"name": "consult_rulebook", "arguments": {"situation": "nut allergy brownie safe?"}})
     payload = json.loads(res["result"]["content"][0]["text"])
     assert payload["outcome"] == "answer"

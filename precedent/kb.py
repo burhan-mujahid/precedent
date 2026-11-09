@@ -11,6 +11,10 @@
     else:
         hand_off(d)                         # a gap was logged; it will come back as a rule
 
+    # while the action runs, and once more after it is done: continue or halt
+    if kb.check(d.id, "About to refund 1200").halted:
+        stop()
+
 Framework-agnostic: wrap `tool_spec()` / `handle_tool_call()` as a tool in LangGraph,
 CrewAI, the OpenAI or Anthropic SDKs, or run `precedent mcp` for any MCP client.
 """
@@ -23,10 +27,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import drift, evals, loop
+from . import drift, evals, guard, loop
 from .calibrate import TierResult, calibrate
 from .drift import Finding
 from .evals import EvalResult
+from .guard import Check
 from .ingest import build_episodes, load_messages
 from .llm import make_client
 from .models import Decision, Gap, Proposal, Rule
@@ -39,7 +44,9 @@ from .store import Store
 AGENT_INSTRUCTIONS = (
     "Call consult_rulebook before acting on any business situation (customers, suppliers, money, data, staff). "
     "If outcome is 'answer', do what it says and mention the rule ids. If 'needs_approval', prepare the action "
-    "but get a human to approve it first. If 'escalate', do not act: tell the user a person will decide."
+    "but get a human to approve it first. If 'escalate', do not act: tell the user a person will decide. "
+    "Once acting, call check_action with the decision_id before each step that changes something, and once more "
+    "with stage 'after' when done. If it returns 'halt', stop at once, change nothing else, and tell the user."
 )
 
 
@@ -76,8 +83,21 @@ class Precedent:
 
     # ------------------------------------------------------------------ runtime
     def resolve(self, situation: str, context: dict[str, Any] | str | None = None, *,
-                dry_run: bool = False, as_of: str | None = None) -> Decision:
-        return self.resolver.resolve(situation, context, dry_run=dry_run, as_of=as_of)
+                dry_run: bool = False, as_of: str | None = None, run_id: str | None = None) -> Decision:
+        return self.resolver.resolve(situation, context, dry_run=dry_run, as_of=as_of, run_id=run_id)
+
+    def check(self, decision_id: str, step: str, *, stage: str = "during") -> Check:
+        """The execution gate: re-check a decision while its action runs, or after it is done."""
+        return guard.check(self.store, decision_id, step, stage=stage)
+
+    def halt(self, decision_id: str, reason: str, by: str, *, stage: str = "during", step: str = "",
+             correction: str = "") -> Check:
+        """A person or an outside probe halts a running action; with `correction`, also drafts a rule fix."""
+        return guard.halt(self.store, decision_id, reason, by, stage=stage, step=step, correction=correction)
+
+    def sign_off(self, decision_id: str, by: str) -> dict[str, Any]:
+        """A person approves a needs_approval decision, so the execution gate lets it run."""
+        return guard.sign_off(self.store, decision_id, by)
 
     # ------------------------------------------------------------------ learning loop
     def ingest(self, path: str | Path, fmt: str = "auto", channel: str | None = None,
@@ -134,7 +154,8 @@ class Precedent:
 
         out = [f"# Weekly rulebook cycle - {self.store.config.get('name')} - {date.today().isoformat()}", "",
                f"- Decisions (30d): {stats['decisions_30d']} | answered {stats['answered_30d']} | "
-               f"needed approval {stats['needs_approval_30d']} | escalation rate {stats['escalation_rate_30d']:.0%}",
+               f"needed approval {stats['needs_approval_30d']} | escalation rate {stats['escalation_rate_30d']:.0%} | "
+               f"running actions halted {stats['halts_30d']}",
                f"- Open gaps: {len(gaps)} in {len(clusters)} cluster(s) | pending proposals: {len(pending)}",
                f"- Regression evals: {res.passed}/{res.total} passing"
                + (f", {res.skipped} skipped" if res.skipped else ""),
@@ -182,10 +203,48 @@ class Precedent:
                     "situation": {"type": "string", "description": "What is happening and what you are about to do, "
                                   "in plain words. Include amounts, timing and who is involved."},
                     "context": {"type": "string", "description": "Optional extra facts (customer tier, order age...)."},
+                    "run_id": {"type": "string", "description": "Optional id of this agent run (letters, digits, "
+                               "'-', '_', '.'). If any step of the run is halted, the whole run stops."},
                 },
                 "required": ["situation"],
             },
         }
+
+    @staticmethod
+    def check_tool_spec() -> dict[str, Any]:
+        """Tool definition for the execution gate (`check_action`)."""
+        return {
+            "name": "check_action",
+            "description": "Re-check a rulebook decision while acting on it: before each step that changes something "
+                           "(stage 'during') and once after you are done (stage 'after'). Returns 'continue' or "
+                           "'halt'. On 'halt', stop at once, change nothing else, and tell the user.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "decision_id": {"type": "string", "description": "The decision_id from consult_rulebook."},
+                    "step": {"type": "string", "description": "The step you are about to take, or what you did, "
+                             "in plain words with the amounts."},
+                    "stage": {"type": "string", "enum": ["during", "after"], "default": "during"},
+                },
+                "required": ["decision_id", "step"],
+            },
+        }
+
+    def handle_check_call(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The agent-facing execution gate. Fails closed: any error comes back as halt."""
+        try:
+            if not isinstance(args, dict):
+                raise ValueError("arguments must be an object with 'decision_id' and 'step'")
+            c = self.check(str(args.get("decision_id") or ""), str(args.get("step") or ""),
+                           stage=str(args.get("stage") or "during"))
+        except Exception as exc:
+            return {"decision_id": args.get("decision_id") if isinstance(args, dict) else None, "outcome": "halt",
+                    "halt_id": None, "reasons": [f"error: {type(exc).__name__}: {exc}"],
+                    "instruction": "Stop. The check could not run; change nothing else and hand this to a person."}
+        out = c.to_dict()
+        out["instruction"] = ("Carry on with this step." if not c.halted else
+                              f"Stop now. Change nothing else and tell the user this was halted ({c.halt_id}).")
+        return out
 
     def handle_tool_call(self, args: dict[str, Any]) -> dict[str, Any]:
         """The agent-facing gate. Fails closed: any error comes back as escalate, never as an exception
@@ -193,7 +252,8 @@ class Precedent:
         try:
             if not isinstance(args, dict):
                 raise ValueError("arguments must be an object with a 'situation' string")
-            d = self.resolve(str(args.get("situation", "")), args.get("context") or None)
+            d = self.resolve(str(args.get("situation", "")), args.get("context") or None,
+                             run_id=str(args["run_id"]) if args.get("run_id") else None)
         except Exception as exc:
             return {"decision_id": None, "outcome": "escalate", "answer": "", "rules": [], "rule_text": [],
                     "risk": None, "confidence": 0.0, "reasons": [f"error: {type(exc).__name__}: {exc}"],
@@ -201,6 +261,7 @@ class Precedent:
         texts = {r.id: r.then for r in self.store.rules("approved")} if d.cited else {}
         return {
             "decision_id": d.id,
+            "run_id": d.run_id,
             "outcome": d.outcome,
             "answer": d.answer,
             "rules": d.cited,
@@ -210,8 +271,9 @@ class Precedent:
             "confidence": d.confidence,
             "reasons": d.reasons,
             "instruction": {
-                "answer": "Act on `answer`. Cite the rule ids.",
-                "needs_approval": "Do NOT act yet. Show `answer` to a human and wait for approval.",
+                "answer": "Act on `answer`. Cite the rule ids. Call check_action before each step and after.",
+                "needs_approval": "Do NOT act yet. Show `answer` to a human and wait for approval. Once they sign "
+                                  f"it off (precedent signoff {d.id}), call check_action before each step.",
                 "escalate": "Do NOT act. Tell the user this needs a person; it has been logged as "
                             + str(d.gap_id) + ".",
             }[d.outcome],

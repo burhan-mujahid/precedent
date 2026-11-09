@@ -29,6 +29,8 @@ The process actually lives in the moments where someone asks a colleague *"how d
 | `Decision` | `logs/decisions.jsonl` | append-only | situation, outcome, answer, cited rule versions, confidence, risk, reasons, gap id |
 | `Gap` | events in `logs/events.jsonl` | append-only events | opened → answered → resolved / dismissed / reopened |
 | Feedback | events in `logs/events.jsonl` | append-only | confirm / override of a decision |
+| `Halt` | `halt` events in `logs/events.jsonl` | append-only | decision, run, stage, reason, cited rule versions, who halted it |
+| Sign-off / check | `decision_signed_off`, `checked` events | append-only | a person's approval of a `needs_approval` decision; each passed execution check |
 | Golden case | `evals/golden.jsonl` | append-only | situation, expected outcome, expected rules |
 | Episode | `sources/episodes.jsonl` | append-only, git-ignored | redacted Q&A, so reviewers can see the evidence |
 
@@ -69,6 +71,30 @@ Before the gates, the situation is length-checked (`runtime.max_situation_chars`
 
 **Replay.** `as_of=YYYY-MM-DD` rebuilds the rulebook in force on that date from version snapshots and decides against it, without logging. This answers "would the agent have done the same thing a month ago, and which rule change made the difference?"
 
+### 5b. Execution gate: during and after an action
+
+The five gates decide whether an action may *start*. That is a policy gate. It cannot stop an action that is already running, and it never sees what actually happened. [Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/) put it plainly when reviewing v0.1.0: act, needs approval and escalate gate the *next* action, and none of them is a HALT. He asked which rule, in which run, halted an in-progress action, and who created the artifact for that halt.
+
+`check(decision_id, step, stage)` (`guard.py`, MCP `check_action`) is the second gate. The agent calls it before each step that changes something (`during`) and once after Done (`after`). It is deterministic and calls no model:
+
+| # | Check | Halts when | Reason |
+|---|---|---|---|
+| 1 | Known | the decision id was never issued | `unknown_decision` |
+| 2 | Sticky | the decision or its run (`run_id`) was halted before | `halted` (returns the existing halt; no new record) |
+| 3 | Single use | the decision already passed an `after` check | `already_done` |
+| 4 | Authorised | the decision was `escalate`, or `needs_approval` with no recorded sign-off | `not_authorized`, `no_sign_off` |
+| 5 | Fresh | more than `runtime.decision_ttl_minutes` since the decision, or since its sign-off | `expired` |
+| 6 | Rules unchanged | a cited rule is no longer approved, or its version or content hash differs from the decision's | `rule_changed` |
+| 7 | In scope | the redacted step has a number or a high-risk word (built-in list plus `risk.high_terms`) found in neither the decision's situation, its answer nor its cited rules | `out_of_scope` |
+
+**The artifact.** Every halt is a `Halt` record, appended to `logs/events.jsonl` as a `halt` event and never edited: id, time, decision id, run id, stage, reason, detail, the redacted step, the cited rule versions and hashes, and `by`. `by` is `precedent:check` for automatic halts, the person for `precedent halt`, and `mcp:<name>` for halts reported over MCP. A passed check is logged as a `checked` event, so "was this action re-checked after Done?" also has an answer.
+
+**Halts are final.** A halted decision, and every other decision in the same run, halts on every later check. A person starts a new run. Sign-off is refused on a decision that was halted before it was signed off: an agent that acts before approval loses the run.
+
+**External halts.** A person or an outside execution monitor calls `halt()` (CLI `precedent halt`, MCP `report_outcome` with `verdict: "halt"`). Precedent records the halt, opens a `halted` gap and, with a correction, drafts an update to the cited rule. Approving that draft resolves the gap and adds a regression case, the same path as any escalation (§6). Precedent does not replace an execution monitor. It gives that monitor's halt a place in the rulebook's audit trail and learning loop.
+
+**Sign-off.** `precedent signoff D-…` records that a person approved a `needs_approval` decision. It is deliberately not exposed over MCP.
+
 ## 6. The learning loop
 
 | Signal | Becomes |
@@ -77,6 +103,7 @@ Before the gates, the situation is length-checked (`runtime.max_situation_chars`
 | Escalation (gap) answered by a person | `create` proposal (or an exception on an existing rule); similar open gaps are folded in |
 | Decision confirmed | golden case |
 | Decision overridden | gap + `update` proposal on the cited rule |
+| Running action halted (out of scope, or by a person or monitor) | halt record + gap; with a correction, an `update` proposal on the cited rule |
 | Session notes (`wrap`) | proposals for decisions recorded in the notes |
 | Drift finding | `deprecate` / `reconfirm` proposal |
 | Proposal approved with gap evidence | gaps resolved + golden cases (`expect: covered`, the new rule id) |
@@ -89,7 +116,7 @@ The weekly `cycle` digest orders the human's work by leverage: gap clusters (one
 | Finding | Signal | Severity |
 |---|---|---|
 | stale | `review_by` passed (default 90 days after last change or reconfirmation) | warn; critical if high risk |
-| overridden | ≥ `drift.override_limit` overrides on decisions citing the rule | critical |
+| overridden | ≥ `drift.override_limit` overrides or out-of-scope/external halts on decisions citing the rule | critical |
 | unused | not cited for `drift.unused_days` | info (dead weight, or retrieval misses it) |
 | duplicate | two approved rules with `when` similarity ≥ threshold | warn (they will diverge) |
 | coverage | > 30% of the last 30 days' decisions escalated (min 10) | warn |

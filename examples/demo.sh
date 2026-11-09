@@ -81,11 +81,22 @@ DEC=$(precedent ask "Customer asks if the brownies are safe for someone with a n
 precedent feedback "$DEC" --override "Also offer the nut-free certified partner bakery as an alternative."
 precedent review list
 
-step "8. The weekly digest" "One page for the owner: gaps to answer, drafts to review, drift, failing evals."
+step "8. Halt an action that is already running" \
+     "After sign-off the agent re-checks before each step and after Done. A step the decision did not authorise halts the whole run, with a record of which rule, which run, and who halted it."
+D2=$(precedent ask "Customer says the birthday cake arrived damaged" --run run-cake --json \
+    | grep -m1 '"id"' | sed -E 's/.*"(D-[^"]+)".*/\1/' || true)
+precedent signoff "$D2" || true
+check() { printf '\n%s> check: %s%s\n' "$BOLD" "$2" "$RST"; precedent check "$@" || true; }   # exit 3 = halt
+check "$D2" "Asking the customer for a photo of the damaged cake"
+check "$D2" "Refunding 5000 to the customer's card"
+check "$D2" "Refunded the cake in full" --after
+precedent halts
+
+step "9. The weekly digest" "One page for the owner: gaps to answer, drafts to review, drift, failing evals."
 precedent cycle | sed '/^(saved to/d'
 precedent health | tail -1
 
-step "9. Export for other agent tools" "Agent Skill, AGENTS.md, Parlant, JSON, Markdown. Or run 'precedent mcp' for the live gates."
+step "10. Export for other agent tools" "Agent Skill, AGENTS.md, Parlant, JSON, Markdown. Or run 'precedent mcp' for the live gates."
 precedent export skill --out "$DIR/export"
 
 printf '\n%sDone in %ss.%s Rulebook left at %s\n' "$BOLD" "$((SECONDS - START))" "$RST" "$DIR"

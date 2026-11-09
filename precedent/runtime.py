@@ -18,6 +18,9 @@ Gates, in order (first failure wins):
                    sent for sign-off as if the rule clearly applied)
     5. risk        cited rule is high-risk                                 -> needs_approval
 
+This gate decides whether an action may start. guard.check() is the second gate, called while the
+action runs and after it is done; `run_id` ties a run's decisions together so a halt stops the run.
+
 The model is treated as untrusted: if it fails, the call escalates; if its answer contains a
 number that is in neither the cited rules nor the situation (a prompt-injected "refund 5000"),
 the call escalates as ungrounded. Callers also get the approved rule text verbatim.
@@ -29,7 +32,7 @@ import re
 from typing import Any
 
 from .ingest.redact import redact
-from .models import ANSWER, ESCALATE, NEEDS_APPROVAL, RISK_LEVELS, Decision, Gap, iso, new_id, utcnow
+from .models import ANSWER, ESCALATE, NEEDS_APPROVAL, RISK_LEVELS, Decision, Gap, iso, new_id, utcnow, valid_id
 from .reasoner import Reasoner, normalize_decision
 from .retrieve import BM25Retriever, Hit
 from .store import Store
@@ -49,10 +52,12 @@ class Resolver:
         return self._index[1]
 
     def resolve(self, situation: str, context: dict[str, Any] | str | None = None, *,
-                dry_run: bool = False, as_of: str | None = None) -> Decision:
+                dry_run: bool = False, as_of: str | None = None, run_id: str | None = None) -> Decision:
         """Decide whether an agent may act. `as_of` (YYYY-MM-DD) replays against a past rulebook
-        and implies dry_run."""
+        and implies dry_run. `run_id` groups the decisions of one agent run."""
         dry_run = dry_run or bool(as_of)
+        if run_id is not None and not valid_id(run_id):
+            raise ValueError("run_id must be 1-64 letters, digits, '-', '_' or '.'")
         cfg = self.store.config
         situation = situation.strip()
         if not situation:
@@ -73,7 +78,7 @@ class Resolver:
         min_cov = float(cfg.get("retrieval.min_coverage", 0.3))
         relevant = [h for h in hits if h.coverage >= min_cov]
         d = Decision(id=new_id("D"), ts=iso(utcnow()), situation=full, outcome=ESCALATE,
-                     considered=[h.rule.id for h in hits], provider=self.reasoner.name)
+                     considered=[h.rule.id for h in hits], provider=self.reasoner.name, run_id=run_id)
 
         if not relevant:
             best = f"{hits[0].rule.id} at {hits[0].coverage:.2f}" if hits else "nothing"
