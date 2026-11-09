@@ -12,7 +12,7 @@ Your job when using this skill: run the CLI, and put **decisions in front of the
 ## 0. Make sure it is installed
 
 ```bash
-precedent --version || pip install "git+https://github.com/burhan-mujahid/precedent"
+precedent --version || pip install precedent-ai
 ```
 
 Every command takes `--root <dir>` (or `PRECEDENT_ROOT`). Set `PRECEDENT_USER` to the person's name so approvals are attributed.

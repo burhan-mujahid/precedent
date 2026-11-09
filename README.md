@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/burhan-mujahid/precedent/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/burhan-mujahid/precedent/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://pypi.org/project/precedent-ai/"><img alt="PyPI" src="https://img.shields.io/pypi/v/precedent-ai?label=pypi%20precedent-ai&color=3775a9"></a>
   <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-3776ab?logo=python&logoColor=white">
   <img alt="One runtime dependency" src="https://img.shields.io/badge/dependencies-1%20(PyYAML)-2ea44f">
   <img alt="Typed" src="https://img.shields.io/badge/typed-mypy%20strict-informational">
@@ -103,8 +104,10 @@ YAML rules, JSONL logs. No database, no vector store, no server. Review rule cha
 No API key needed. Python 3.10+.
 
 ```bash
-pip install "git+https://github.com/burhan-mujahid/precedent@v0.2.1"
+pip install precedent-ai
 ```
+
+The package on PyPI is `precedent-ai`; you import it and run it as `precedent`.
 
 **See the whole loop in about 20 seconds** on a sample bakery WhatsApp group:
 
@@ -380,7 +383,7 @@ provider:
 Model names change often, so Precedent never hard-codes one. If a model rejects `temperature` or `reasoning_effort`, the client drops it and retries. Mining runs `ingest.workers` (default 4) model calls in parallel and prints the calls and tokens it used.
 
 > [!NOTE]
-> On python.org builds of Python for macOS, HTTPS fails until you run *Install Certificates.command*. Or install the extra: `pip install "precedent-ai[certs] @ git+https://github.com/burhan-mujahid/precedent"`.
+> On python.org builds of Python for macOS, HTTPS fails until you run *Install Certificates.command*. Or install the extra: `pip install "precedent-ai[certs]"`.
 
 <details>
 <summary><b>Full configuration (<code>precedent.yaml</code>) with defaults</b></summary>

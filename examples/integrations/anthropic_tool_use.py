@@ -1,6 +1,6 @@
 """Give a Claude agent the rulebook as tools (Anthropic Messages API, tool use).
 
-pip install anthropic "git+https://github.com/burhan-mujahid/precedent@v0.2.1" ; export ANTHROPIC_API_KEY=...
+pip install anthropic precedent-ai ; export ANTHROPIC_API_KEY=...
 
 Two tools: consult_rulebook decides whether an action may start; check_action re-checks each
 step and the result after Done, and halts the run if a step goes beyond the decision.
