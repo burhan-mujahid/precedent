@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "precedent": {
+      "command": "precedent",
+      "args": ["mcp", "--root", "/absolute/path/to/my-rulebook"],
+      "env": { "PRECEDENT_USER": "agent" }
+    }
+  }
+}

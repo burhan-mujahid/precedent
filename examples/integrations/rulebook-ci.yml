@@ -1,0 +1,15 @@
+# Put this in the GitHub repo that holds your rulebook (.github/workflows/rulebook.yml).
+# Every pull request that changes a rule must keep all regression cases passing and
+# introduce no critical drift.
+name: rulebook
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install "git+https://github.com/burhan-mujahid/precedent@v0.1.0"
+      - run: precedent eval --min-pass 1.0
+      - run: precedent health --strict

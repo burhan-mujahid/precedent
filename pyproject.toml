@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "precedent-ai"
+version = "0.1.0"
+description = "Operating rules for AI agents, mined from how your team already works - with human approval, runtime gates, drift detection and regression evals."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Muhammad Burhan Mujahid" }]
+keywords = ["ai-agents", "llm", "knowledge-base", "human-in-the-loop", "agent-skills", "mcp", "context-engineering", "governance"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["PyYAML>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/burhan-mujahid/precedent"
+Documentation = "https://github.com/burhan-mujahid/precedent#readme"
+Changelog = "https://github.com/burhan-mujahid/precedent/blob/main/CHANGELOG.md"
+Issues = "https://github.com/burhan-mujahid/precedent/issues"
+Security = "https://github.com/burhan-mujahid/precedent/blob/main/SECURITY.md"
+
+[project.optional-dependencies]
+certs = ["certifi"]   # CA bundle for Pythons without system certificates (python.org macOS builds)
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
+
+[project.scripts]
+precedent = "precedent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["precedent*"]
+
+[tool.setuptools.package-data]
+precedent = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: calls a real model provider (needs API keys; skipped when they are not set)"]
+addopts = "--strict-markers"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["precedent"]
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["certifi"]
+ignore_missing_imports = true
