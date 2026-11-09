@@ -9,9 +9,8 @@
 
 ## 0.2.0 - 2026-11-09
 
-Execution gate: halt an action that is already running, and re-check after Done. Thanks to
-[Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/), who pointed out that act / needs approval / escalate only gate the next action and none
-of them is a HALT.
+Execution gate: halt an action that is already running, and re-check after Done. In 0.1, act /
+needs approval / escalate only gated the next action; none of them could halt one in progress.
 
 * `check_action` (MCP), `kb.check()`, `precedent check`: called before each step and after Done; returns
   `continue` or `halt`. Deterministic checks, no model call: unknown decision, already halted (decision or

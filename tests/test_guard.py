@@ -102,12 +102,12 @@ def test_unknown_decision_halts_and_is_recorded(seeded):
 
 def test_external_halt_becomes_a_rule_fix_and_a_regression_case(seeded):
     d = seeded.resolve(ALLERGY, run_id="run-9")
-    c = seeded.halt(d.id, "probe: agent was about to promise nut-free", "probe:rule-4c", stage="during",
+    c = seeded.halt(d.id, "probe: agent was about to promise nut-free", "probe:monitor", stage="during",
                     step="Telling the customer the brownie is nut-free",
                     correction="Never say nut-free, even for recipes without nuts")
     assert c.halted and c.gap_id and c.proposal_id
     h = seeded.store.halts()[0]
-    assert (h.reason, h.by, h.proposal_id) == ("external", "probe:rule-4c", c.proposal_id)
+    assert (h.reason, h.by, h.proposal_id) == ("external", "probe:monitor", c.proposal_id)
     assert seeded.store.proposal(c.proposal_id).target == d.cited[0]["id"]
     assert seeded.check(d.id, "Replying on order 1182").halted, "the run stays halted"
     approve(seeded.store, c.proposal_id, "owner")

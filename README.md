@@ -38,7 +38,7 @@
 <p align="center"><sub>Real output from <code>bash examples/demo.sh</code> (offline, no API key). Long lines shortened to fit.</sub></p>
 
 > [!NOTE]
-> **New in 0.2: halting a run that's already going.** Approving the start of an action isn't enough. Agents now re-check before every step and after Done, and Precedent **halts** the run when a step goes beyond what was approved, a rule changes mid-run, or a decision is reused or stale. Each halt leaves a record of which rule, which run, and who halted it. [How it works](#-the-execution-gate-halting-a-run-thats-already-going) · prompted by [Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/).
+> **New in 0.2: halting a run that's already going.** Approving the start of an action isn't enough. Agents now re-check before every step and after Done, and Precedent **halts** the run when a step goes beyond what was approved, a rule changes mid-run, or a decision is reused or stale. Each halt leaves a record of which rule, which run, and who halted it. [How it works](#-the-execution-gate-halting-a-run-thats-already-going).
 
 ## 🧭 The problem
 
@@ -474,10 +474,6 @@ pip install -e ".[dev]" && pytest -q && ruff check . && mypy
 ```
 
 Live provider tests (skipped without keys): `GEMINI_API_KEY=… MOONSHOT_API_KEY=… pytest -m live`.
-
-## 🙏 Acknowledgements
-
-The execution gate (`check_action`, halt records, sign-off, `report_outcome` halts) exists because [Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/) pushed on the first release. He pointed out that act, needs approval and escalate only gate the *next* action: none of them is a HALT. He asked which rule, in which run, actually halted an in-progress action, and who created the artifact for that halt. In v0.1.0 the honest answer was "nothing does". Now every halt has a record that answers all three. Thank you, Gary.
 
 ## 📚 Citing
 

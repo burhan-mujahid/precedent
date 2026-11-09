@@ -73,7 +73,7 @@ Before the gates, the situation is length-checked (`runtime.max_situation_chars`
 
 ### 5b. Execution gate: during and after an action
 
-The five gates decide whether an action may *start*. That is a policy gate. It cannot stop an action that is already running, and it never sees what actually happened. [Gary Ko](https://www.linkedin.com/in/gary-ko-976863210/) put it plainly when reviewing v0.1.0: act, needs approval and escalate gate the *next* action, and none of them is a HALT. He asked which rule, in which run, halted an in-progress action, and who created the artifact for that halt.
+The five gates decide whether an action may *start*. That is a policy gate. It cannot stop an action that is already running, and it never sees what actually happened. In v0.1.0, act, needs approval and escalate gated only the *next* action, and none of them was a halt. A halt needs to answer three questions: which rule, in which run, stopped an in-progress action, and who created the record of it.
 
 `check(decision_id, step, stage)` (`guard.py`, MCP `check_action`) is the second gate. The agent calls it before each step that changes something (`during`) and once after Done (`after`). It is deterministic and calls no model:
 

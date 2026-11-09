@@ -84,8 +84,7 @@ high-risk word the decision never covered, if a cited rule changed mid-run, if t
 expired or was already used, or if a high-risk action was never signed off. The halt record names
 the decision, the run, the rule versions, the stage and who halted it (`precedent halts`). A halted
 run stays halted. If your own monitor halts a run, it reports it with `report_outcome` →
-`halt`, and that halt becomes a draft rule fix and a regression test. (This gate exists because
-Gary Ko asked exactly this question about v0.1.0.)
+`halt`, and that halt becomes a draft rule fix and a regression test.
 
 ### "What if the model is wrong?"
 
