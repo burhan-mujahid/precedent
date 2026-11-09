@@ -456,7 +456,7 @@ docs/              DESIGN.md · LIVE-RESULTS.md · DEMO.md
 
 ## 📍 Status and limits
 
-**v0.2.1, alpha.** 139 tests, run by CI on Linux (Python 3.10 to 3.13), macOS and Windows; ruff and strict mypy clean. Known limits:
+**v0.2.2, alpha.** 139 tests, run by CI on Linux (Python 3.10 to 3.13), macOS and Windows; ruff and strict mypy clean. Known limits:
 
 - **The offline reasoner is lexical.** It's a deterministic baseline for tests and demos; real deployments should use a model for `extract` and `decide`.
 - **Retrieval is BM25.** It suits rulebooks of tens to low thousands of rules written in the team's own words. Stemming is English-only; Urdu and Roman Urdu chats parse fine, but rules match on exact words. An embedding retriever can drop in behind the same one-method interface.
@@ -484,7 +484,7 @@ If Precedent helps your research or product, please cite it. GitHub's **"Cite th
   author  = {Mujahid, Muhammad Burhan},
   title   = {Precedent: human-approved operating rules and deterministic action gates for AI agents},
   year    = {2026},
-  version = {0.2.1},
+  version = {0.2.2},
   url     = {https://github.com/burhan-mujahid/precedent}
 }
 ```

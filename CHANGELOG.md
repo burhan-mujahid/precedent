@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 - 2026-11-09
+
+* Docs only: the package description on PyPI is refreshed from the current README. No code changes.
+
 ## 0.2.1 - 2026-11-09
 
 * Fix: `precedent ask --dry-run` and `precedent replay` printed a gap id to answer, but dry runs never
