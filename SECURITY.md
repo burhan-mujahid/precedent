@@ -2,8 +2,8 @@
 
 ## Reporting a vulnerability
 
-Please report privately through GitHub: **Security → Report a vulnerability** on this repository.
-Do not open a public issue. You will get a reply within 7 days. Fixes are released as a patch
+Please report privately through GitHub: **Security → Report a vulnerability** on this repository,
+or by email to burhanmujahid552@gmail.com. Do not open a public issue. You will get a reply within 7 days. Fixes are released as a patch
 version and credited in the CHANGELOG unless you ask otherwise.
 
 Supported versions: the latest release only (Precedent is pre-1.0).

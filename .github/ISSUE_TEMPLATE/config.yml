@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/burhan-mujahid/precedent/discussions
+    about: How-to questions, use cases and design discussion.
+  - name: Report a security vulnerability
+    url: https://github.com/burhan-mujahid/precedent/security/advisories/new
+    about: Please report privately, not in a public issue.

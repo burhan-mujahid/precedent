@@ -5,13 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "precedent-ai"
 version = "0.1.0"
-description = "Operating rules for AI agents, mined from how your team already works - with human approval, runtime gates, drift detection and regression evals."
+description = "Human-approved operating rules and deterministic action gates for AI agents, mined from how your team already works (WhatsApp, Slack), with drift detection and regression evals."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Muhammad Burhan Mujahid" }]
-keywords = ["ai-agents", "llm", "knowledge-base", "human-in-the-loop", "agent-skills", "mcp", "context-engineering", "governance"]
+keywords = ["ai-agents", "llm", "llm-agents", "agentic-ai", "guardrails", "human-in-the-loop", "knowledge-base",
+            "sop", "business-rules", "policy", "governance", "mcp", "model-context-protocol", "agent-skills",
+            "context-engineering", "prompt-injection", "evals", "whatsapp", "slack", "langgraph", "claude", "gemini"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -21,6 +23,12 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Typing :: Typed",
+  "Environment :: Console",
+  "Intended Audience :: Information Technology",
+  "Operating System :: OS Independent",
+  "Topic :: Office/Business",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Communications :: Chat",
   "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = ["PyYAML>=6.0"]

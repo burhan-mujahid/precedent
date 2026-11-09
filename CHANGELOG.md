@@ -12,7 +12,7 @@ First public release.
 * Security: redaction of secrets and personal data in situations as well as chats; prompt fences that untrusted text cannot close; id validation for file paths; cross-process lock on approvals; range-checked safety config; API keys only over HTTPS (or localhost); size limits on inputs and responses; sanitised exports; MCP feedback attributed as `mcp:`. See SECURITY.md.
 * Supply chain: pip-audit in CI, Actions pinned to SHAs, Dependabot.
 * Packaging: distributed as `precedent-ai` (the import and the `precedent` command are unchanged). Tagged releases build, attest provenance, create a GitHub release and publish to PyPI through Trusted Publishing.
-* Docs: README, demo guide (docs/DEMO.md), security policy (SECURITY.md).
+* Docs: README, demo guide (docs/DEMO.md), security policy (SECURITY.md), CITATION.cff, llms.txt, code of conduct, issue and PR templates.
 * Learning loop: gaps → clustered weekly digest → draft rules → regression cases; confirm/override feedback; session wrap.
 * Drift detection: stale, overridden, unused, duplicate, coverage.
 * Regression evals and evidence-based threshold calibration.

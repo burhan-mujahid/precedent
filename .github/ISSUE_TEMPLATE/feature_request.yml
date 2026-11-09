@@ -1,0 +1,19 @@
+name: Feature request
+description: A new capability, integration, chat format or domain pack
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation, not the solution. Who is the agent, what should it decide?
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Ingest / chat formats, Runtime gates, Learning loop, Drift / evals, Integrations (MCP, SDKs, exports), Model providers, Docs, Other]

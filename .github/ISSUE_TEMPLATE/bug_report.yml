@@ -1,0 +1,28 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Security issue? Please report it privately instead (see SECURITY.md). Never paste API keys or real chat exports."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands you ran, and a minimal (made-up) chat or rule if relevant.
+      render: shell
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: precedent --version, Python version, OS
+    validations: { required: true }
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model (provider.kind / provider.model), or offline

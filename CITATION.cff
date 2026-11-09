@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use Precedent, please cite it as below."
+type: software
+title: "Precedent: human-approved operating rules and deterministic action gates for AI agents"
+abstract: >-
+  Precedent turns how a team already works into operating rules that AI agents follow.
+  It mines question-and-answer threads from team chat (WhatsApp, Slack, JSONL) into draft
+  rules grounded in the source messages, requires a person to approve every change, and
+  gates each agent action through deterministic checks outside the model (coverage,
+  judgement, grounding, risk-tiered confidence, risk), returning act, needs-approval or
+  escalate. Every escalation becomes a draft rule and a regression test; drift detection
+  flags stale, overridden, unused and duplicate rules. It runs as a Python library, CLI,
+  MCP server, or compiles to Agent Skills and AGENTS.md.
+authors:
+  - family-names: Mujahid
+    given-names: Muhammad Burhan
+    email: burhanmujahid552@gmail.com
+repository-code: "https://github.com/burhan-mujahid/precedent"
+url: "https://github.com/burhan-mujahid/precedent"
+license: MIT
+version: 0.1.0
+date-released: "2026-11-09"
+keywords:
+  - AI agents
+  - LLM agents
+  - human-in-the-loop
+  - agent guardrails
+  - tacit knowledge
+  - standard operating procedures
+  - knowledge base
+  - abstention
+  - selective prediction
+  - prompt injection
+  - Model Context Protocol
+  - agent skills
+  - governance

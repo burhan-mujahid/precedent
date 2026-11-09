@@ -417,6 +417,26 @@ pip install -e ".[dev]" && pytest -q && ruff check . && mypy
 
 Live provider tests (skipped without keys): `GEMINI_API_KEY=… MOONSHOT_API_KEY=… pytest -m live`.
 
+## 📚 Citing
+
+If Precedent helps your research or product, please cite it. GitHub's **"Cite this repository"** button (from [CITATION.cff](CITATION.cff)) gives APA and BibTeX:
+
+```bibtex
+@software{mujahid_precedent_2026,
+  author  = {Mujahid, Muhammad Burhan},
+  title   = {Precedent: human-approved operating rules and deterministic action gates for AI agents},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/burhan-mujahid/precedent}
+}
+```
+
+## 📬 Contact
+
+**Muhammad Burhan Mujahid**: [burhanmujahid552@gmail.com](mailto:burhanmujahid552@gmail.com) · [@burhan-mujahid](https://github.com/burhan-mujahid)
+
+Questions and ideas: [Discussions](https://github.com/burhan-mujahid/precedent/discussions). Bugs: [Issues](https://github.com/burhan-mujahid/precedent/issues). Security reports: [privately](SECURITY.md), please.
+
 ## 📄 License
 
 [MIT](LICENSE) © Muhammad Burhan Mujahid
