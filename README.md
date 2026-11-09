@@ -5,6 +5,7 @@
 <p align="center">
   <a href="https://github.com/burhan-mujahid/precedent/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/burhan-mujahid/precedent/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://pypi.org/project/precedent-ai/"><img alt="PyPI" src="https://img.shields.io/pypi/v/precedent-ai?label=pypi%20precedent-ai&color=3775a9"></a>
+  <a href="https://doi.org/10.5281/zenodo.24087058"><img alt="DOI" src="https://zenodo.org/badge/DOI/10.5281/zenodo.24087058.svg"></a>
   <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-3776ab?logo=python&logoColor=white">
   <img alt="One runtime dependency" src="https://img.shields.io/badge/dependencies-1%20(PyYAML)-2ea44f">
   <img alt="Typed" src="https://img.shields.io/badge/typed-mypy%20strict-informational">
@@ -485,6 +486,7 @@ If Precedent helps your research or product, please cite it. GitHub's **"Cite th
   title   = {Precedent: human-approved operating rules and deterministic action gates for AI agents},
   year    = {2026},
   version = {0.2.3},
+  doi     = {10.5281/zenodo.24087058},
   url     = {https://github.com/burhan-mujahid/precedent}
 }
 ```

@@ -21,6 +21,7 @@ repository-code: "https://github.com/burhan-mujahid/precedent"
 url: "https://github.com/burhan-mujahid/precedent"
 license: MIT
 version: 0.2.3
+doi: 10.5281/zenodo.24087058
 date-released: "2026-11-09"
 keywords:
   - AI agents
