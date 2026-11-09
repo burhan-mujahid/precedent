@@ -141,10 +141,10 @@ class Resolver:
     def _finish(self, d: Decision, gap_reason: str | None, dry_run: bool) -> Decision:
         if gap_reason:
             d.outcome = ESCALATE
-            gap = Gap(id=new_id("G"), ts=d.ts, situation=d.situation, reason=gap_reason,
-                      decision_id=d.id, considered=d.considered)
-            d.gap_id = gap.id
-            if not dry_run:
+            if not dry_run:   # a dry run or replay must not point people at a gap that was never saved
+                gap = Gap(id=new_id("G"), ts=d.ts, situation=d.situation, reason=gap_reason,
+                          decision_id=d.id, considered=d.considered)
+                d.gap_id = gap.id
                 self.store.log_event("gap_opened", gap=gap.to_dict())
         if not dry_run:
             self.store.log_decision(d)

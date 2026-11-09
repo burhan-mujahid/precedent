@@ -55,8 +55,9 @@ def test_high_risk_needs_approval_and_opens_no_gap(seeded):
 
 
 def test_dry_run_logs_nothing(seeded):
-    seeded.resolve("Should we start selling coffee beans wholesale?", dry_run=True)
+    d = seeded.resolve("Should we start selling coffee beans wholesale?", dry_run=True)
     assert seeded.store.decisions() == [] and seeded.store.gaps() == []
+    assert d.outcome == "escalate" and d.gap_id is None, "never point at a gap that was not saved"
 
 
 def test_ungrounded_citation_escalates(seeded):

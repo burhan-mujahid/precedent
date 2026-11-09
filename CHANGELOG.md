@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 - 2026-11-09
+
+* Fix: `precedent ask --dry-run` and `precedent replay` printed a gap id to answer, but dry runs never
+  save gaps, so `precedent gaps answer` on that id failed. Dry runs no longer report a gap id.
+* The Anthropic tool-use and LangGraph examples now register `check_action` next to `consult_rulebook`,
+  so agents built from them re-check each step and halt.
+
 ## 0.2.0 - 2026-11-09
 
 Execution gate: halt an action that is already running, and re-check after Done. Thanks to
