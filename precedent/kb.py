@@ -27,7 +27,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import drift, evals, guard, loop
+from . import boundary, drift, evals, guard, loop
 from .calibrate import TierResult, calibrate
 from .drift import Finding
 from .evals import EvalResult
@@ -98,6 +98,17 @@ class Precedent:
     def sign_off(self, decision_id: str, by: str) -> dict[str, Any]:
         """A person approves a needs_approval decision, so the execution gate lets it run."""
         return guard.sign_off(self.store, decision_id, by)
+
+    # ------------------------------------------------------------------ tool boundary
+    def guarded(self, *, name: str | None = None, final: bool = False, ignore: Any = (),
+                describe: Callable[[Any], str] | None = None) -> Callable[[boundary.F], boundary.F]:
+        """Decorator: the tool runs only when the execution gate says continue (see boundary.py)."""
+        return boundary.guarded(self, name=name, final=final, ignore=ignore, describe=describe)
+
+    def guard_handlers(self, handlers: dict[str, Callable[[dict[str, Any]], Any]], *, pass_through: Any = (),
+                       final: Any = (), ignore: dict[str, Any] | None = None) -> dict[str, Callable[..., Any]]:
+        """Wrap a tool-name -> handler(args) table so every tool needs a current decision."""
+        return boundary.guard_handlers(self, handlers, pass_through=pass_through, final=final, ignore=ignore)
 
     # ------------------------------------------------------------------ learning loop
     def ingest(self, path: str | Path, fmt: str = "auto", channel: str | None = None,

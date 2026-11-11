@@ -31,6 +31,12 @@ when it should not, so every safeguard below fails closed: when in doubt, a pers
 | An agent reuses one approval for many actions, or days later | A decision closes after its after-Done check (`already_done`) and expires after `runtime.decision_ttl_minutes` (`expired`) | `test_one_decision_covers_one_action`, `test_decisions_expire` |
 | An agent retries past a halt | Halts are final for the decision and its whole run | `test_halts_are_sticky_for_the_decision_and_its_run` |
 | An agent signs off its own high-risk action | There is no sign-off over MCP; a NEEDS APPROVAL decision halts until a person runs `precedent signoff` | `test_agents_cannot_sign_off_over_mcp` |
+| An agent skips the rulebook and calls a tool directly | Guarded tools (`@kb.guarded`, `kb.guard_handlers`) and `precedent proxy` run the execution gate before the tool body or the upstream call. With no current decision, the tool does not run and a halt record is written | `test_no_decision_means_no_call_and_a_halt_record`, `test_calls_without_a_current_decision_never_reach_upstream` |
+| An agent describes a step blandly ("helping the customer") while the tool call refunds 5000 | At the boundary the step is built from the real tool name and arguments, not the agent's description | `test_step_is_built_from_the_real_arguments`, `test_in_scope_call_is_forwarded_without_decision_id` |
+| An agent fires the same final tool twice at once, before the first returns | The proxy refuses a second final call on a decision while one is in flight | `test_consult_through_the_proxy_then_final_tool_closes_the_decision` |
+| An amount or action slips past the scope check in other words ("five thousand", "5k", "wire it") | Amounts are normalised however they are written, and common synonyms of high-risk actions map to the same term; `risk.synonyms` adds your own | `test_amounts_in_words_are_still_amounts`, `test_synonyms_of_high_risk_actions_are_caught` |
+| A verifier, an agent or another reviewer approves a change to a rule they don't own | A change to an owned rule needs its owner, a listed delegate or an admin (`rules.owner_approval`, on by default). Each version records who approved it | `test_changes_to_an_owned_rule_need_its_owner`, `test_shadow_mode_mismatch_becomes_an_owner_approved_fix` |
+| The HTTP API is reachable from the network | `precedent serve` binds to localhost and refuses any other address without `PRECEDENT_HTTP_TOKEN`; with a token, every request needs it (compared in constant time) | `test_token_is_required_when_set`, `test_refuses_public_bind_without_token` |
 | The execution gate errors or gets bad input | `handle_check_call` returns `halt`; it never raises to the agent | `test_bad_inputs` |
 | Oversized inputs (cost, memory) | Situations over `runtime.max_situation_chars` (4000) are refused; MCP lines over 1 MB and model responses over 10 MB are rejected; MCP `limit` is capped at 100 | `test_tool_call_fails_closed` |
 
@@ -59,16 +65,23 @@ when it should not, so every safeguard below fails closed: when in doubt, a pers
   so an edit without a version bump is still visible in the audit trail.
 * **The MCP server trusts its client.** It runs over stdio as a subprocess of the agent host;
   it does not listen on a network port.
-* **It does not stop an agent that never asks.** Precedent is a gate the agent calls. Enforce
-  the call in your agent framework (for example, a tool that can only run after
-  `consult_rulebook` returned `answer` and `check_action` returned `continue`). A halt takes
-  effect at the agent's next check, not mid-way through a single tool call.
+* **It only stops the paths you route through it.** On their own, `consult_rulebook` and
+  `check_action` are gates the agent chooses to call. Guarded tools and `precedent proxy` take
+  that choice away for the tools they wrap, but a path you leave unguarded (another tool, a
+  shell, credentials the agent holds directly) is not covered. A halt takes effect at the next
+  check, not mid-way through a single tool call.
+* **Owners are names, not accounts.** Owner-gated approval compares the `--by` name (or
+  `$PRECEDENT_USER`) to the rule's owner. It keeps honest reviewers in their lane and records
+  who approved each version, but anyone can type someone else's name. Protect the rulebook with
+  git and reviewed pull requests.
 * **Halts can be used to deny service.** Anyone who can call `report_outcome` with `halt`, or
   write to the rulebook folder, can halt a run. That fails closed, and the halt record says who
   did it (`mcp:<name>` for anything over MCP).
-* **Scope checks are lexical.** The execution gate compares numbers and a list of high-risk
-  words. A step written in other words ("five thousand", "wire it") can pass. Keep
-  `risk.high_terms` up to date for your domain.
+* **Scope checks are lexical.** The execution gate compares amounts (in digits, shorthand like
+  "5k" or "2 lakh", or words) and high-risk actions with their common synonyms. It does not
+  understand meaning: a step phrased in words it has no entry for can still pass. Add your
+  team's phrasing to `risk.high_terms` and `risk.synonyms`, and prefer guarded tools, where the
+  step comes from structured arguments.
 * **Number grounding is not semantic grounding.** An injected answer with no numbers ("cancel
   the order") that cites a real rule can still pass. Keep money, legal, health and irreversible
   actions on `high` risk, so a person signs off.

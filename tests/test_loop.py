@@ -42,11 +42,43 @@ def test_approve_update_versions_and_history(seeded):
     rid = seeded.store.rules("approved")[0].id
     p = Proposal(id=new_id("P"), kind="update", target=rid, rule={"then": "New action."})
     seeded.store.save_proposal(p)
-    r = approve(seeded.store, p.id, "owner")
-    assert r.version == 2 and r.then == "New action."
+    r = approve(seeded.store, p.id, "tester")
+    assert r.version == 2 and r.then == "New action." and r.approved_by == "tester"
     assert [h.version for h in seeded.store.rule_history(rid)] == [1]
     with pytest.raises(StoreError):
-        approve(seeded.store, p.id, "owner")
+        approve(seeded.store, p.id, "tester")
+
+
+def test_changes_to_an_owned_rule_need_its_owner(seeded):
+    rid = seeded.store.rules("approved")[0].id        # owned by "tester"
+    p = Proposal(id=new_id("P"), kind="update", target=rid, rule={"then": "Something else."})
+    seeded.store.save_proposal(p)
+    with pytest.raises(StoreError, match="tester owns"):
+        approve(seeded.store, p.id, "someone-else")
+    assert seeded.store.proposal(p.id).status == "pending" and seeded.store.rule(rid).version == 1
+    assert approve(seeded.store, p.id, "Tester").approved_by == "Tester", "names match regardless of case"
+
+
+def test_delegates_admins_and_opting_out(seeded):
+    rid = seeded.store.rules("approved")[0].id
+    seeded.store.config.data["rules"].update({"delegates": {"tester": ["deputy"]}, "admins": ["boss"]})
+    for who in ("deputy", "boss"):
+        p = Proposal(id=new_id("P"), kind="reconfirm", target=rid)
+        seeded.store.save_proposal(p)
+        assert approve(seeded.store, p.id, who).approved_by == who
+    seeded.store.config.data["rules"]["owner_approval"] = False
+    p = Proposal(id=new_id("P"), kind="deprecate", target=rid)
+    seeded.store.save_proposal(p)
+    assert approve(seeded.store, p.id, "anyone").status == "deprecated"
+
+
+def test_starter_pack_rules_need_no_owner(tmp_path):
+    kb = Precedent.init(tmp_path / "packed", pack="support")
+    pack_rule = kb.store.rules("approved")[0]
+    assert pack_rule.owner.startswith("pack:")
+    p = Proposal(id=new_id("P"), kind="update", target=pack_rule.id, rule={"then": "Our own way."})
+    kb.store.save_proposal(p)
+    assert approve(kb.store, p.id, "anyone").version == 2
 
 
 def test_edit_on_approval_and_reject(kb):

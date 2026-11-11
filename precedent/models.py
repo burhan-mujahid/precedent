@@ -133,6 +133,7 @@ class Rule:
     risk: str = "low"
     status: str = "draft"
     owner: str = ""
+    approved_by: str = ""          # who approved this version
     tags: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
     version: int = 1
@@ -148,7 +149,7 @@ class Rule:
                 setattr(self, name, value.isoformat()[:10])
             elif value is None:
                 setattr(self, name, "")
-        for name in ("title", "when", "then", "why", "owner"):
+        for name in ("title", "when", "then", "why", "owner", "approved_by"):
             value = getattr(self, name)
             if value is None:
                 setattr(self, name, "")

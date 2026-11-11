@@ -1,6 +1,6 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
-from precedent.models import ANSWER, ESCALATE, NEEDS_APPROVAL
+from precedent.models import ANSWER, ESCALATE, NEEDS_APPROVAL, utcnow
 from precedent.retrieve import BM25Retriever, stem, tokens
 from precedent.runtime import Resolver
 
@@ -99,7 +99,7 @@ def test_high_risk_below_approval_floor_escalates(seeded):
 
 def test_stale_rule_is_penalised(seeded):
     rule = seeded.store.rules("approved")[0]
-    rule.review_by = (date.today() - timedelta(days=1)).isoformat()
+    rule.review_by = (utcnow().date() - timedelta(days=1)).isoformat()   # rules go stale by UTC date
     seeded.store.save_rule(rule)
     def reply(hits):
         return {"status": "covered", "answer": "a", "rule_ids": [hits[0].rule.id], "confidence": 0.8}

@@ -19,6 +19,9 @@ Use it when an AI agent (customer support, operations, sales, finance, on-call) 
 - `Precedent.tool_spec()` / `handle_tool_call(args)`: function-calling tool `consult_rulebook`, fails closed
 - `Precedent.check(decision_id, step, stage="during"|"after")` returns a Check with `outcome` in {continue, halt}; `halt()`, `sign_off()`; halt records via `store.halts()`
 - `precedent mcp --root DIR`: MCP tools consult_rulebook, check_action, report_outcome (confirm / override / halt), search_rules, open_gaps
+- `precedent proxy --root DIR -- <mcp server command>`: another MCP server's tools behind the execution gate; no call runs without a current decision_id
+- `precedent serve --root DIR`: HTTP API, POST /consult, /check, /outcome
+- `@kb.guarded()` / `kb.guard_handlers()`: Python tools that refuse to run without a current decision
 - `precedent ingest | review | ask | signoff | check | halt | halts | gaps | feedback | cycle | health | eval | calibrate | export`
 
 ## Optional

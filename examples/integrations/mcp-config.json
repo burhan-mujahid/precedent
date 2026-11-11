@@ -4,6 +4,13 @@
       "command": "precedent",
       "args": ["mcp", "--root", "/absolute/path/to/my-rulebook"],
       "env": { "PRECEDENT_USER": "agent" }
+    },
+    "payments": {
+      "command": "precedent",
+      "args": ["proxy", "--root", "/absolute/path/to/my-rulebook",
+               "--pass", "list_orders", "--final", "issue_refund",
+               "--", "npx", "-y", "@acme/payments-mcp"],
+      "env": { "PRECEDENT_USER": "agent" }
     }
   }
 }

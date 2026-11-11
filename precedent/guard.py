@@ -20,9 +20,11 @@ and none of them calls a model:
     5. fresh       the decision (or its sign-off) is younger than
                    runtime.decision_ttl_minutes (default 60)                  -> expired
     6. rules       every cited rule is still approved, same version and text  -> rule_changed
-    7. scope       every number and every high-risk word (bank, refund,
+    7. scope       every amount and every high-risk action (bank, refund,
                    delete, the pack's own terms...) in the step appears in
-                   the decision, its situation or its cited rules             -> out_of_scope
+                   the decision, its situation or its cited rules. Amounts
+                   match however they are written (1,000 / 1k / one
+                   thousand), and so do actions ("wire" is a transfer)    -> out_of_scope
 
 Scope is what stops a decision being reused for something else: an answer about a nut allergy
 cannot authorise "change the supplier's bank details", even though that step has no amount.
@@ -46,8 +48,8 @@ from typing import Any
 from .ingest.redact import redact
 from .loop import answer_gap
 from .models import CONTINUE, ESCALATE, HALT, NEEDS_APPROVAL, STAGES, Decision, Gap, Halt, iso, new_id, utcnow, valid_id
-from .reasoner import high_risk_terms
-from .runtime import _numbers, _rule_text
+from .runtime import _rule_text
+from .scope import numbers, risk_terms
 from .store import Store, StoreError
 
 AUTO = "precedent:check"
@@ -154,9 +156,9 @@ def check(store: Store, decision_id: str, step: str, *, stage: str = "during") -
         return _halt(store, c, d, "rule_changed", "; ".join(changed), step, by=AUTO)
 
     authorised = " ".join([d.situation, d.answer, *texts])
-    extra = sorted(_numbers(step) - _numbers(authorised))
-    terms = store.config.get("risk.high_terms") or []
-    extra += sorted(high_risk_terms(step, terms) - high_risk_terms(authorised, terms))
+    extra = sorted(numbers(step) - numbers(authorised))
+    terms, synonyms = store.config.get("risk.high_terms") or [], store.config.get("risk.synonyms") or {}
+    extra += sorted(risk_terms(step, terms, synonyms) - risk_terms(authorised, terms, synonyms))
     if extra:
         return _halt(store, c, d, "out_of_scope",
                      f"the step uses {', '.join(extra)}, which the decision did not authorise",

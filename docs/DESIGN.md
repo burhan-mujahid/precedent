@@ -159,8 +159,4 @@ The full threat model, with the test for each defence, is in [SECURITY.md](../SE
 
 ## 12. Roadmap
 
-* Connectors that pull directly from Slack, WhatsApp Business, Gmail and helpdesks.
-* Embedding retriever (optional extra) behind the existing `Retriever` interface.
-* Sample-based confidence (agreement across several model calls) as a third calibration signal.
-* Review UI (single static page over the same files).
-* Multi-reviewer quorum for high-risk rules.
+See [ROADMAP.md](../ROADMAP.md).

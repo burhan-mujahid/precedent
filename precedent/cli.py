@@ -11,6 +11,8 @@
     precedent cycle                        # the weekly 30-minute digest
     precedent doctor                       # check model provider + key
     precedent health | eval | calibrate | replay | export | mcp
+    precedent proxy -- <mcp server command>     # no upstream tool runs without a current decision
+    precedent serve                        # HTTP API: POST /consult, /check, /outcome
 """
 
 from __future__ import annotations
@@ -88,6 +90,9 @@ def _show_proposal(kb: Precedent, p: Proposal) -> None:
     if p.target:
         cur = kb.store.rule(p.target)
         print(f"  target: {cur.id} v{cur.version} - {cur.title}")
+        allowed = loop.approvers(kb.store, p)
+        if allowed is not None:
+            print(f"  approver: {cur.owner} owns {cur.id}; approval needs {', '.join(sorted(allowed))}")
         for k, v in p.rule.items():
             if k == "sources":
                 continue
@@ -199,7 +204,9 @@ def cmd_review(args: argparse.Namespace) -> int:
         return 0
     if args.action == "list" or not sys.stdin.isatty():
         for p in pending:
-            print(f"{p.id}  {p.kind:9} {p.target or '':6} {loop.label(kb.store, p)[:70]}  ({p.origin})")
+            allowed = loop.approvers(kb.store, p)
+            who = f"  needs {kb.store.rule(p.target or '').owner}" if allowed is not None else ""
+            print(f"{p.id}  {p.kind:9} {p.target or '':6} {loop.label(kb.store, p)[:70]}  ({p.origin}){who}")
         return 0
     print(f"{len(pending)} draft(s). [a]pprove  [e]dit+approve  [r]eject  [s]kip  [q]uit")
     for p in pending:
@@ -388,7 +395,8 @@ def cmd_rules(args: argparse.Namespace) -> int:
         return 0
     if args.action == "history":
         for r in [*kb.store.rule_history(args.id), kb.store.rule(args.id)]:
-            print(f"v{r.version} {r.updated} {r.status:10} then: {r.then[:100]}")
+            who = f" by {r.approved_by}" if r.approved_by else ""
+            print(f"v{r.version} {r.updated}{who} {r.status:10} then: {r.then[:100]}")
         return 0
     if args.action == "reconfirm":
         p = Proposal(id=new_id("P"), kind="reconfirm", target=args.id, rationale="reconfirmed by a person",
@@ -495,6 +503,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 def cmd_mcp(args: argparse.Namespace) -> int:
     from .mcp import Server
     Server(_kb(args)).serve()
+    return 0
+
+
+def cmd_proxy(args: argparse.Namespace) -> int:
+    from .proxy import Proxy
+    upstream = args.upstream[1:] if args.upstream[:1] == ["--"] else args.upstream
+    return Proxy(_kb(args), upstream, pass_through=args.pass_through or [], final=args.final or []).serve()
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    from .httpapi import serve
+    httpd = serve(_kb(args), args.host, args.port)
+    print(f"precedent HTTP API on http://{args.host}:{httpd.server_port} (POST /consult, /check, /outcome)",
+          file=sys.stderr)
+    try:
+        httpd.serve_forever()
+    finally:
+        httpd.server_close()
     return 0
 
 
@@ -636,6 +662,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("mcp", parents=[common], help="run the MCP server on stdio")
     p.set_defaults(fn=cmd_mcp)
+
+    p = sub.add_parser("proxy", parents=[common],
+                       help="gate another MCP server's tools: no call runs without a current decision")
+    p.add_argument("--pass", dest="pass_through", action="append", metavar="TOOL",
+                   help="a read-only tool that runs without a decision (repeatable)")
+    p.add_argument("--final", action="append", metavar="TOOL",
+                   help="a tool that finishes an action: run the after-Done check once it returns (repeatable)")
+    p.add_argument("upstream", nargs=argparse.REMAINDER, help="-- then the upstream MCP server's command")
+    p.set_defaults(fn=cmd_proxy)
+
+    p = sub.add_parser("serve", parents=[common], help="HTTP API for workflow tools (n8n, Make, Zapier)")
+    p.add_argument("--host", default="127.0.0.1", help="beyond localhost needs PRECEDENT_HTTP_TOKEN")
+    p.add_argument("--port", type=int, default=8787)
+    p.set_defaults(fn=cmd_serve)
     return ap
 
 

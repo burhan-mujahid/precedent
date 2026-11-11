@@ -165,6 +165,29 @@ def label(store: Store, p: Proposal) -> str:
     return ""
 
 
+def approvers(store: Store, p: Proposal) -> set[str] | None:
+    """Who may approve this proposal, or None when anyone may.
+
+    A change to an existing rule needs that rule's owner, someone listed for them under
+    `rules.delegates`, or someone in `rules.admins`. New rules, and rules with no owner (or a
+    starter-pack owner), can be approved by any reviewer. `rules.owner_approval: false` turns
+    this off."""
+    if not store.config.get("rules.owner_approval", True) or p.kind == "create" or not p.target:
+        return None
+    try:
+        owner = store.rule(p.target).owner.strip()
+    except StoreError:
+        return None
+    if not owner or owner.startswith("pack:"):
+        return None
+    delegates = (store.config.get("rules.delegates") or {}).get(owner) or []
+    return {owner, *delegates, *(store.config.get("rules.admins") or [])}
+
+
+def _same_person(a: str, b: str) -> bool:
+    return a.strip().casefold() == b.strip().casefold()
+
+
 def approve(store: Store, pid: str, by: str, edits: dict[str, Any] | None = None) -> Rule:
     with store.lock():
         return _approve(store, pid, by, edits)
@@ -174,6 +197,12 @@ def _approve(store: Store, pid: str, by: str, edits: dict[str, Any] | None = Non
     p = store.proposal(pid)
     if p.status != "pending":
         raise StoreError(f"{pid} is already {p.status}")
+    allowed = approvers(store, p)
+    if allowed is not None and not any(_same_person(by, a) for a in allowed):
+        owner = store.rule(p.target or "").owner
+        raise StoreError(f"{pid} changes {p.target}, which {owner} owns: only they can approve it "
+                         f"(or someone under rules.delegates.{owner} or rules.admins in precedent.yaml). "
+                         f"You are {by}.")
     review_days = int(store.config.get("rules.review_days", 90))
     fields_ = {**p.rule, **(edits or {})}
     clean = _clean_rule_fields(fields_)
@@ -205,6 +234,7 @@ def _approve(store: Store, pid: str, by: str, edits: dict[str, Any] | None = Non
     else:
         raise StoreError(f"unknown proposal kind {p.kind}")
 
+    rule.approved_by = by       # who permitted this version
     store.save_rule(rule)
     p.status, p.decided_by, p.decided_at = "approved", by, iso(utcnow())
     if edits:

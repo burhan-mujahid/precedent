@@ -28,13 +28,13 @@ the call escalates as ungrounded. Callers also get the approved rule text verbat
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from .ingest.redact import redact
 from .models import ANSWER, ESCALATE, NEEDS_APPROVAL, RISK_LEVELS, Decision, Gap, iso, new_id, utcnow, valid_id
 from .reasoner import Reasoner, normalize_decision
 from .retrieve import BM25Retriever, Hit
+from .scope import numbers
 from .store import Store
 
 
@@ -107,7 +107,7 @@ class Resolver:
         cited: list[Hit] = [given[i] for i in cited_ids]
         d.cited = [{"id": h.rule.id, "version": h.rule.version, "sha": h.rule.fingerprint()} for h in cited]
         d.answer = str(result.get("answer") or cited[0].rule.then)
-        invented = _numbers(d.answer) - _numbers(full, *(_rule_text(h.rule) for h in cited))
+        invented = numbers(d.answer) - numbers(full, *(_rule_text(h.rule) for h in cited))
         if invented:
             d.reasons.append(f"ungrounded: answer uses {', '.join(sorted(invented))}, "
                              "which is in neither the cited rules nor the situation")
@@ -149,14 +149,6 @@ class Resolver:
         if not dry_run:
             self.store.log_decision(d)
         return d
-
-
-_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
-
-
-def _numbers(*texts: str) -> set[str]:
-    """Numbers as written, ignoring thousands separators: '1,000' and '1000' are the same."""
-    return {re.sub(r"[.,]0+$", "", n.replace(",", "")) for t in texts for n in _NUMBER.findall(t)}
 
 
 def _rule_text(rule: Any) -> str:

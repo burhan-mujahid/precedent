@@ -77,8 +77,8 @@ def _text(args: dict[str, Any], key: str, max_len: int = 4000) -> str:
 
 
 class Server:
-    def __init__(self, kb: Precedent):
-        self.kb = kb
+    def __init__(self, kb: Precedent, channel: str = "mcp"):
+        self.kb, self.channel = kb, channel
 
     def call(self, name: str, args: dict[str, Any]) -> Any:
         if not isinstance(args, dict):
@@ -91,8 +91,8 @@ class Server:
             verdict = args.get("verdict")
             if verdict not in ("confirm", "override", "halt"):
                 raise ValueError("verdict must be confirm, override or halt")
-            # Agents cannot vouch for themselves: whatever they claim, the audit trail says it came over MCP.
-            by = "mcp:" + str(args.get("by") or "agent")[:80]
+            # Agents cannot vouch for themselves: whatever they claim, the audit trail says how it came in.
+            by = f"{self.channel}:" + str(args.get("by") or "agent")[:80]
             if verdict == "halt":
                 c = self.kb.halt(_text(args, "decision_id", 64), _text(args, "reason", 1000), by,
                                  stage=str(args.get("stage") or "during"), step=str(args.get("step") or ""),

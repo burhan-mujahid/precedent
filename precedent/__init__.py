@@ -4,7 +4,7 @@ Mine rules from team chat -> a person approves -> agents consult the rulebook th
 deterministic gates -> every escalation becomes next week's rule and a regression test.
 """
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 
 from .kb import Precedent  # noqa: E402
 from .models import ANSWER, ESCALATE, NEEDS_APPROVAL, Decision, Gap, Proposal, Rule  # noqa: E402

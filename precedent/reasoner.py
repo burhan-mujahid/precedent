@@ -19,6 +19,7 @@ from typing import Any, Protocol
 from .llm import LLMClient, LLMParseError, parse_json
 from .models import Episode, Rule
 from .retrieve import Hit, jaccard, keywords
+from .scope import is_high_risk, risk_terms
 
 # ----------------------------------------------------------------------------- prompts
 
@@ -168,9 +169,6 @@ class LLMReasoner:
 
 # ----------------------------------------------------------------------------- offline
 
-_HIGH = re.compile(r"\b(refund|chargeback|payment|pay|invoice|discount|price|contract|legal|lawyer|delete|"
-                   r"terminate|fire|salary|bank|transfer|credit|tax|compensat|waive|write.?off|allerg|poison|"
-                   r"injur|medical|safety)\w*", re.I)
 _MEDIUM = re.compile(r"\b(customer|client|complain|order|deliver|reply|email|review|supplier|quote)\w*", re.I)
 _WHY = re.compile(r"\b(because|since|so that|that way|last time|or else|to avoid|the reason)\b", re.I)
 _EXCEPT = re.compile(r"\b(unless|except|but if|only if|apart from)\b", re.I)
@@ -226,7 +224,7 @@ def classify_risk(text: str, high_terms: Sequence[str] = (), medium_terms: Seque
     Errs low only because every draft is reviewed by a person before it becomes a rule.
     """
     low = text.lower()
-    if _HIGH.search(text) or any(t.lower() in low for t in high_terms):
+    if is_high_risk(text, high_terms):
         return "high"
     if _MEDIUM.search(text) or any(t.lower() in low for t in medium_terms):
         return "medium"
@@ -235,8 +233,7 @@ def classify_risk(text: str, high_terms: Sequence[str] = (), medium_terms: Seque
 
 def high_risk_terms(text: str, high_terms: Sequence[str] = ()) -> set[str]:
     """The high-risk words in `text` (money, legal, health, deletion, plus the rulebook's own terms)."""
-    low = text.lower()
-    return {m.lower() for m in _HIGH.findall(text)} | {t.lower() for t in high_terms if t.lower() in low}
+    return risk_terms(text, high_terms)
 
 
 class OfflineReasoner:

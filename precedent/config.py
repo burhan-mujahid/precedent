@@ -42,12 +42,22 @@ DEFAULTS: dict[str, Any] = {
         "max_situation_chars": 4000,    # longer inputs are refused (cost and prompt-injection surface)
         "decision_ttl_minutes": 60,     # how long a decision (or its sign-off) authorises action
     },
+    "boundary": {
+        # For `precedent proxy`: tools that run without a decision (read-only lookups only),
+        # and tools that finish an action (the after-Done check runs once they return).
+        "pass_through": [],
+        "final": [],
+    },
     "retrieval": {
         "top_k": 5,
         "min_coverage": 0.30,       # below this, the rulebook does not cover the situation
     },
     "rules": {
         "review_days": 90,          # every rule gets re-confirmed at least this often
+        # A change to an existing rule needs its owner's approval (or a delegate's, or an admin's).
+        "owner_approval": True,
+        "delegates": {},            # owner -> [people who may approve in their place]
+        "admins": [],               # may approve any change
     },
     "drift": {
         "unused_days": 60,
@@ -58,6 +68,9 @@ DEFAULTS: dict[str, Any] = {
         # Extra words that mark an action high/medium risk (domain packs fill these in).
         "high_terms": [],
         "medium_terms": [],
+        # Other ways your team says a high-risk action, mapped to the word it means,
+        # e.g. {"top up": "transfer"}. Used by the execution gate's scope check.
+        "synonyms": {},
     },
     "ingest": {
         "redact": True,             # strip phone numbers / emails before anything is stored or sent
@@ -106,6 +119,21 @@ class Config:
         number("retrieval.min_coverage", 0, 1)
         number("runtime.max_situation_chars", 1, 1_000_000)
         number("runtime.decision_ttl_minutes", 1, 10_080)
+        for key in ("boundary.pass_through", "boundary.final", "risk.high_terms", "risk.medium_terms", "rules.admins"):
+            value = self.get(key)
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise ValueError(f"{key} must be a list of strings, got {value!r}")
+        synonyms = self.get("risk.synonyms")
+        if not isinstance(synonyms, dict) or not all(isinstance(k, str) and isinstance(v, str)
+                                                     for k, v in synonyms.items()):
+            raise ValueError(f"risk.synonyms must map words to the term they mean, got {synonyms!r}")
+        delegates = self.get("rules.delegates")
+        if not isinstance(delegates, dict) or not all(
+                isinstance(k, str) and isinstance(v, list) and all(isinstance(x, str) for x in v)
+                for k, v in delegates.items()):
+            raise ValueError(f"rules.delegates must map an owner to a list of people, got {delegates!r}")
+        if not isinstance(self.get("rules.owner_approval"), bool):
+            raise ValueError("rules.owner_approval must be true or false")
 
     def save(self, path: Path) -> None:
         path.write_text(yaml.safe_dump(self.data, sort_keys=False), encoding="utf-8")

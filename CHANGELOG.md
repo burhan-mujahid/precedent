@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.0 - 2026-11-12
+
+Enforcement at the tool boundary. Until now, `consult_rulebook` and `check_action` were gates the
+agent chose to call, so an agent that never asked was never stopped. Now the gate can sit inside the
+tools themselves.
+
+* `@kb.guarded()`: a decorator for Python tools (sync or async). The tool runs only when the execution
+  gate says `continue` for its `decision_id`; otherwise it raises `Blocked` and never runs. A missing or
+  unknown decision is still checked, so the attempt is a halt record. The step is built from the real tool
+  name and arguments. `final=True` runs the after-Done check once the tool returns.
+* `kb.guard_handlers()` for function-calling dispatch tables (a blocked call returns the halt as the tool
+  result) and `precedent.boundary.require_decision()` to add `decision_id` to a tool schema.
+* `precedent proxy -- <mcp server command>`: an MCP proxy that adds a required `decision_id` to every
+  upstream tool, serves `consult_rulebook` / `check_action` / `report_outcome` itself, and never forwards a
+  call that fails the gate. `--pass` for read-only tools, `--final` for tools that finish an action (a
+  second call on the same decision is refused while the first is in flight). Also `boundary.pass_through`
+  and `boundary.final` in precedent.yaml.
+* Owner-gated approval: a change to an existing rule needs its owner, someone under
+  `rules.delegates.<owner>`, or someone in `rules.admins`. On by default (`rules.owner_approval`). New
+  rules and starter-pack rules need no owner. Each rule version records `approved_by`; `precedent review
+  list` and `rules history` show who is needed and who approved.
+* `precedent serve`: an HTTP API (`POST /consult`, `/check`, `/outcome`, `/tools/<name>`) for n8n, Make and
+  Zapier. Standard library only, localhost by default, bearer token (`PRECEDENT_HTTP_TOKEN`) required
+  beyond localhost. Halts reported over HTTP are recorded as `http:<name>`.
+* Scope checks catch more phrasings: amounts in words ("five thousand"), shorthand ("5k", "2.5 lakh",
+  "3 crore"), and synonyms of high-risk actions ("wire" = transfer, "reimburse" = refund, "IBAN" = bank).
+  New setting `risk.synonyms` for your own. The grounding gate uses the same number matching.
+* Outside verifiers: [docs/VERIFIERS.md](docs/VERIFIERS.md) and
+  `examples/integrations/report_mismatches.py`, which feeds a shadow-mode verifier's mismatches into
+  `report_outcome`.
+* Config lists and maps (`risk.*`, `boundary.*`, `rules.delegates`, `rules.admins`) are type-checked on load.
+* Tests: the stale-rule test used the local date, and failed for a few hours each day in time zones ahead
+  of UTC.
+
 ## 0.2.3 - 2026-11-09
 
 * First release archived on Zenodo, so Precedent has a citable DOI. No code changes.

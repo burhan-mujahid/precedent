@@ -39,7 +39,7 @@
 <p align="center"><sub>Real output from <code>bash examples/demo.sh</code> (offline, no API key). Long lines shortened to fit.</sub></p>
 
 > [!NOTE]
-> **New in 0.2: halting a run that's already going.** Approving the start of an action isn't enough. Agents now re-check before every step and after Done, and Precedent **halts** the run when a step goes beyond what was approved, a rule changes mid-run, or a decision is reused or stale. Each halt leaves a record of which rule, which run, and who halted it. [How it works](#-the-execution-gate-halting-a-run-thats-already-going).
+> **New in 0.3: the gate sits inside the tools.** Until now, an agent that never asked the rulebook was never stopped. Now `@kb.guarded()` Python tools and `precedent proxy` (in front of any MCP server) refuse to run a call without a current decision, and the check is built from the real tool name and arguments. Also new: only a rule's owner can approve changes to it, an HTTP API for n8n / Make / Zapier, and scope checks that catch "five thousand" and "wire it". [How it works](#-enforce-it-at-the-tool-boundary).
 
 ## 🧭 The problem
 
@@ -74,7 +74,7 @@ There is exactly **one door** into the rulebook: an approved proposal. Models dr
 <td valign="top">
 
 ### 🚦 A gate before every action, and while it runs
-Agents call `consult_rulebook` before acting. **Five deterministic gates outside the model** return one of three outcomes: act, ask a human to approve, or escalate. Then `check_action` re-checks **before each step and after Done**, and **halts** the run if the step goes beyond what was approved.
+Agents call `consult_rulebook` before acting. **Five deterministic gates outside the model** return one of three outcomes: act, ask a human to approve, or escalate. Then `check_action` re-checks **before each step and after Done**, and **halts** the run if the step goes beyond what was approved. Put the gate [inside the tools](#-enforce-it-at-the-tool-boundary) and an agent can't skip it.
 
 </td>
 <td valign="top">
@@ -212,7 +212,35 @@ Every halt is a **halt record** in `logs/events.jsonl`: the decision, the run, t
   why    : halted: H-20261109T1428-e1f2fb8921 (out_of_scope) already stopped this decision; a person starts a new run
 ```
 
-**Bring your own monitor.** If something outside Precedent halts a run, such as an execution monitor or a person watching, it calls `report_outcome` with `verdict: "halt"` (or `precedent halt D-… "why" --fix "what should happen"`). Precedent records the halt, stops the rest of the run, opens a gap and drafts the rule fix. Approving the fix adds a regression case.
+**Bring your own monitor.** If something outside Precedent halts a run, such as an execution monitor or a person watching, it calls `report_outcome` with `verdict: "halt"` (or `precedent halt D-… "why" --fix "what should happen"`). Precedent records the halt, stops the rest of the run, opens a gap and drafts the rule fix. Approving the fix adds a regression case. Only the cited rule's owner can approve that fix. The full contract for outside verifiers, including shadow mode: [docs/VERIFIERS.md](docs/VERIFIERS.md).
+
+### 🔒 Enforce it at the tool boundary
+
+The two gates above are tools the agent calls. **An agent that never calls them is never stopped.** To take that choice away from the agent, put the gate inside the tools themselves, so a tool that changes something won't run without a current decision.
+
+**Python tools:** decorate them.
+
+```python
+@kb.guarded()
+def issue_refund(order: str, amount: int) -> str: ...
+
+issue_refund("1182", 1200, decision_id=d.id)   # checks "issue refund: order=1182, amount=1200", then runs
+issue_refund("1182", 1200)                     # raises Blocked: never runs, and a halt record is written
+```
+
+The step is built from the **real tool name and arguments**, not from the agent's description of them, so the scope check sees the actual amount and action. Mark the tool that finishes an action with `final=True`, and the after-Done check runs once it returns. For function-calling loops, `kb.guard_handlers({...})` wraps a dispatch table (a blocked call returns the halt as the tool result) and `require_decision(spec)` adds `decision_id` to a tool's schema.
+
+**MCP servers:** put the proxy in front.
+
+```json
+{ "mcpServers": { "payments": { "command": "precedent", "args": [
+    "proxy", "--root", "/path/to/my-rulebook", "--pass", "list_orders", "--final", "issue_refund",
+    "--", "npx", "-y", "@acme/payments-mcp"] } } }
+```
+
+The client sees the upstream server's tools, each with a required `decision_id`, plus `consult_rulebook`, `check_action` and `report_outcome`. A call that fails the execution gate **never reaches the upstream server**. `--pass` marks read-only tools that need no decision. `--final` tools run the after-Done check, and a second call on the same decision is refused while the first is still in flight.
+
+What this covers: every call that goes through a guarded tool or the proxy. What it doesn't cover: a path you leave unguarded, such as a tool the agent can reach another way or credentials it holds directly. The boundary is only as complete as the set of paths you route through it.
 
 ## 🔌 Plug it into your agent
 
@@ -257,21 +285,31 @@ For function-calling APIs, `kb.tool_spec()` gives a JSON Schema tool definition 
 | `consult_rulebook` | the runtime gate: answer / needs_approval / escalate, with cited rule versions and the approved wording |
 | `check_action` | the execution gate, before each step and after Done: continue / halt |
 | `report_outcome` | confirm (becomes a regression test), override (drafts a rule fix for human review), or halt (an outside monitor stopped the run: halt record + gap + draft fix) |
-
-Agents can't sign off their own NEEDS APPROVAL decisions: there is no sign-off tool over MCP.
 | `search_rules` | read-only lookup of approved rules |
 | `open_gaps` | what agents couldn't handle, waiting for a human |
+
+Agents can't sign off their own NEEDS APPROVAL decisions: there is no sign-off tool over MCP. To gate another MCP server's tools, use `precedent proxy` ([above](#-enforce-it-at-the-tool-boundary)).
 
 </details>
 
 <details>
-<summary><b>⚙️ Shell, n8n, Make, cron: anything that can run a command</b></summary>
+<summary><b>⚙️ Shell, n8n, Make, Zapier, cron: a command or an HTTP call</b></summary>
 
 ```bash
 precedent ask "Supplier emailed saying their bank account has changed" --json
 ```
 
 Prints the full decision as JSON. The exit code is `0` only when the agent may act on its own and `3` otherwise, so a script can't proceed by accident.
+
+No command step? Run the HTTP API and branch on `outcome`:
+
+```bash
+precedent serve --root ./my-rulebook        # http://127.0.0.1:8787
+curl -s localhost:8787/consult -d '{"situation": "Supplier says their bank account changed", "run_id": "n8n-42"}'
+curl -s localhost:8787/check   -d '{"decision_id": "D-...", "step": "Replying to the supplier"}'
+```
+
+`POST /consult`, `/check` and `/outcome` return the same JSON as the MCP tools and fail closed the same way. It binds to localhost. To listen on any other address, set `PRECEDENT_HTTP_TOKEN`, and every request then needs `Authorization: Bearer <token>`.
 
 </details>
 
@@ -446,6 +484,10 @@ precedent/
   reasoner.py    extract / decide / wrap: model-backed and deterministic offline versions
   runtime.py     the five gates
   guard.py       the execution gate: check during and after an action, halt records, sign-off
+  scope.py       what a step commits to: amounts (1k, one thousand) and high-risk actions (wire = transfer)
+  boundary.py    guarded tools: @kb.guarded, guard_handlers, require_decision
+  proxy.py       precedent proxy: the execution gate in front of another MCP server
+  httpapi.py     precedent serve: the same tools over HTTP
   loop.py        mining, review, gaps, feedback, session wrap
   drift.py       health checks           evals.py     regression replay
   calibrate.py   evidence-based thresholds  export.py  Skill / AGENTS.md / Parlant / JSON
@@ -457,14 +499,14 @@ docs/              DESIGN.md · LIVE-RESULTS.md · DEMO.md
 
 ## 📍 Status and limits
 
-**v0.2.3, alpha.** 139 tests, run by CI on Linux (Python 3.10 to 3.13), macOS and Windows; ruff and strict mypy clean. Known limits:
+**v0.3.0, alpha.** 162 tests, run by CI on Linux (Python 3.10 to 3.13), macOS and Windows; ruff and strict mypy clean. Known limits:
 
 - **The offline reasoner is lexical.** It's a deterministic baseline for tests and demos; real deployments should use a model for `extract` and `decide`.
 - **Retrieval is BM25.** It suits rulebooks of tens to low thousands of rules written in the team's own words. Stemming is English-only; Urdu and Roman Urdu chats parse fine, but rules match on exact words. An embedding retriever can drop in behind the same one-method interface.
 - **Calibration needs evidence.** Thresholds are only recommended once a risk tier has enough regression cases.
-- **No built-in authentication.** Whoever can write the rulebook folder can approve rules. Keep it in a git repo with reviewed pull requests ([SECURITY.md](SECURITY.md)).
+- **No built-in authentication.** Whoever can write the rulebook folder can approve rules. Changes to an owned rule need its owner's name, but names aren't verified. Keep the rulebook in a git repo with reviewed pull requests ([SECURITY.md](SECURITY.md)).
 
-**Roadmap:** direct connectors (Slack, WhatsApp Business, Gmail, helpdesks) · an optional embedding retriever · agreement across several model samples as a confidence signal · a static review UI · multi-reviewer quorum for high-risk rules.
+**Roadmap:** [ROADMAP.md](ROADMAP.md).
 
 ## 🤝 Contributing
 
@@ -485,7 +527,7 @@ If Precedent helps your research or product, please cite it. GitHub's **"Cite th
   author  = {Mujahid, Muhammad Burhan},
   title   = {Precedent: human-approved operating rules and deterministic action gates for AI agents},
   year    = {2026},
-  version = {0.2.3},
+  version = {0.3.0},
   doi     = {10.5281/zenodo.24087058},
   url     = {https://github.com/burhan-mujahid/precedent}
 }

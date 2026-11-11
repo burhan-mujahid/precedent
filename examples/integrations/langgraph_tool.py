@@ -19,4 +19,12 @@ def check_action(decision_id: str, step: str, stage: str = "during") -> dict:
     once after you are done (stage 'after'). If outcome is 'halt', stop at once and tell the user."""
     return kb.handle_check_call({"decision_id": decision_id, "step": step, "stage": stage})
 
-# agent = create_react_agent(model, tools=[consult_rulebook, check_action, ...])
+
+@tool
+@kb.guarded(final=True)
+def issue_refund(order: str, amount: float) -> str:
+    """Refund a customer's order. Needs the decision_id from consult_rulebook; refused without a current one."""
+    return f"refunded {amount} on {order}"      # your payment call goes here
+    # A refused call raises precedent.boundary.Blocked: let it reach the agent as a tool error.
+
+# agent = create_react_agent(model, tools=[consult_rulebook, check_action, issue_refund, ...])
